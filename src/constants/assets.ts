@@ -1,0 +1,1 @@
+export const toplineLogo = require('../../assets/topline-cricket-image.jpg');
