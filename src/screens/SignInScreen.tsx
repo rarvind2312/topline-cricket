@@ -143,7 +143,7 @@ const SignInScreen: React.FC<Props> = ({ navigation }) => {
 
         <Text style={styles.label}>Password</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, {marginBottom:20}]}
           placeholder="Password"
           placeholderTextColor="#9ca3af"
           value={password}

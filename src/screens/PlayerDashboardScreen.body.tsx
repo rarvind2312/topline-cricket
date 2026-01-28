@@ -48,6 +48,11 @@ type RecentFeedback = {
 function safeToDate(input: any): Date | null {
   if (!input) return null;
 
+  // ✅ FIX: already a Date
+  if (input instanceof Date) {
+    return Number.isNaN(input.getTime()) ? null : input;
+  }
+
   // Firestore Timestamp
   if (typeof input === 'object' && typeof input.toDate === 'function') {
     try {
@@ -175,8 +180,6 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
       return unsub;
     };
 
-
-
     // ✅ Recent feedback: also derived from sessions, realtime, no composite indexes
     const loadRecentFeedbackRealtime = () => {
       setLoadingFeedback(true);
@@ -255,16 +258,17 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
   }, [uid]);
 
   const formatDateTime = (value: any) => {
-  const d = safeToDate(value);
-  if (!d) return '—';
-  return d.toLocaleString('en-AU', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-};
+    const d = safeToDate(value);
+    if (!d) return '—';
+    return d.toLocaleString('en-AU', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
   // -----------------------------
   // Stats (manual entry; saved to Firestore)
   // -----------------------------
@@ -348,26 +352,27 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
     return d ? formatDateTime(d) : '';
   }, [upcoming]);
 
-
   const shimmerAnim = React.useRef(new Animated.Value(0)).current;
 
-useEffect(() => {
-  const loop = Animated.loop(
-    Animated.timing(shimmerAnim, {
-      toValue: 1,
-      duration: 1200,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: true,
-    })
-  );
-  loop.start();
-  return () => loop.stop();
-}, [shimmerAnim]);
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 1200,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmerAnim]);
 
-const shimmerTranslateX = shimmerAnim.interpolate({
-  inputRange: [0, 1],
-  outputRange: [-120, 220],
-});
+  const shimmerTranslateX = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-140, 260],
+  });
+
+  
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -397,135 +402,143 @@ const shimmerTranslateX = shimmerAnim.interpolate({
         </View>
 
         {/* Upcoming Session */}
-       <>
+   
+<>
   <View style={styles.sectionHeaderRow}>
     <Text style={styles.sectionTitle}>Upcoming Session</Text>
   </View>
 
-  <View style={styles.cardWrap}>
+  {/* ✅ No outer white card */}
+  <View style={styles.sectionBlock}>
     {loadingUpcoming ? (
-  <View style={styles.cardWrap}>
-    <View style={styles.shimmerBlock}>
-      <Animated.View style={[styles.shimmerOverlay, { transform: [{ translateX: shimmerTranslateX }] }]}>
-        <LinearGradient
-          colors={['transparent', 'rgba(255,255,255,0.22)', 'transparent']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.shimmerGradient}
-        />
-      </Animated.View>
-    </View>
+      <View style={styles.toplineSectionCard}>
+        <View style={styles.shimmerBox}>
+          <Animated.View
+            style={[
+              styles.shimmerOverlay,
+              { transform: [{ translateX: shimmerTranslateX }] },
+            ]}
+          >
+            <LinearGradient
+              colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ flex: 1 }}
+            />
+          </Animated.View>
+        </View>
+        <View style={{ height: 12 }} />
+        <View style={[styles.shimmerBox, { height: 18, width: '55%' }]} />
+      </View>
+    ) : upcoming ? (
+      <View style={styles.toplineSectionCard}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Text style={styles.bigTitle}>{upcoming.skill || 'Session'}</Text>
 
-    <View style={[styles.shimmerBlock, { height: 22, marginTop: 10, width: '55%' }]} />
-    <View style={[styles.shimmerBlock, { height: 44, marginTop: 10 }]} />
-  </View>
-) : upcoming ? (
-  <View style={styles.cardWrap}>
-    <LinearGradient
-      colors={['#B31217', '#E52D27']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.toplineGradientCard}
-    >
-      {/* Title row */}
-      <View style={styles.titleRow}>
-        <Text style={styles.toplineTitle}>{upcoming.skill || 'Session'}</Text>
-
-        {!!upcoming.status && (
-          <View style={styles.toplineChip}>
-            <Ionicons name="time-outline" size={14} color="#fff" />
-            <Text style={styles.toplineChipText}>{String(upcoming.status)}</Text>
+          <View style={[styles.pill, { alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={styles.pillText}>
+              {(String(upcoming.status || 'Scheduled')).toUpperCase()}
+            </Text>
           </View>
-        )}
-      </View>
-
-      {/* Pills */}
-      <View style={styles.pillRow}>
-        <View style={styles.toplinePill}>
-          <Ionicons name="person-outline" size={16} color="#fff" />
-          <Text style={styles.toplinePillText}>{upcoming.coachName || '—'}</Text>
         </View>
 
-        <View style={styles.toplinePill}>
-          <Ionicons name="calendar-outline" size={16} color="#fff" />
-          <Text style={styles.toplinePillText}>{formatDateTime(upcoming.startAt) || '—'}</Text>
+        <View style={styles.divider} />
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={styles.pillText}>
+              👤 {String(upcoming.coachName || '—')}
+            </Text>
+          </View>
+
+          <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={styles.pillText}>
+              🗓 {formatDateTime(upcoming.startAt) || '—'}
+            </Text>
+          </View>
         </View>
       </View>
-    </LinearGradient>
-  </View>
-) : (
-  <View style={styles.cardWrap}>
-    <Text style={styles.emptyBody}>Once you book your first session, it will appear here.</Text>
-  </View>
-)}
+    ) : (
+      <View style={styles.toplineSectionCard}>
+        <Text style={styles.emptyBody}>
+          No Upcoming Sessions yet.
+        </Text>
+      </View>
+    )}
   </View>
 </>
 
- {/* Recent Reviews */}
-<>
+
+        {/* Recent Reviews */}
+        <>
   <View style={styles.sectionHeaderRow}>
     <Text style={styles.sectionTitle}>Recent Feedback</Text>
   </View>
 
-  <View style={styles.cardWrap}>
+  {/* ✅ Remove the outer white card look */}
+  <View style={styles.sectionBlock}>
     {loadingFeedback ? (
-  <View style={styles.cardWrap}>
-    <View style={styles.shimmerBlock}>
-      <Animated.View style={[styles.shimmerOverlay, { transform: [{ translateX: shimmerTranslateX }] }]}>
-        <LinearGradient
-          colors={['transparent', 'rgba(255,255,255,0.22)', 'transparent']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.shimmerGradient}
-        />
-      </Animated.View>
-    </View>
+      <View style={styles.toplineSectionCard}>
+        <View style={styles.shimmerBox}>
+          <Animated.View
+            style={[
+              styles.shimmerOverlay,
+              { transform: [{ translateX: shimmerTranslateX }] },
+            ]}
+          >
+            <LinearGradient
+              colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ flex: 1 }}
+            />
+          </Animated.View>
+        </View>
+        <View style={{ height: 12 }} />
+        <View style={[styles.shimmerBox, { height: 18, width: '70%' }]} />
+      </View>
+    ) : recentFeedback ? (
+      <View style={styles.toplineSectionCard}>
+        {/* ✅ Date + Skill (bold + visible) */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={styles.pillText}>
+              🗓 {String(recentFeedback.createdAtLabel || '—')}
+            </Text>
+          </View>
 
-    <View style={[styles.shimmerBlock, { height: 22, marginTop: 10, width: '70%' }]} />
-    <View style={[styles.shimmerBlock, { height: 50, marginTop: 10 }]} />
-  </View>
-) : recentFeedback ? (
-  <View style={styles.cardWrap}>
-    <LinearGradient
-      colors={['#7A0A0C', '#B31217']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.toplineGradientCard}
-    >
-      {/* Date + Skill row */}
-      <View style={styles.feedbackMetaRow}>
-        <View style={styles.metaPill}>
-          <Ionicons name="calendar-outline" size={14} color="#fff" />
-          <Text style={styles.metaPillText}>{formatDateTime(recentFeedback.createdAtLabel) || '—'}</Text>
+          {/* ✅ Center align Batting */}
+          <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={styles.pillText}>
+              🏏 {String(recentFeedback.skill || 'Coach notes')}
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.metaPill}>
-          <Ionicons name="tennisball-outline" size={14} color="#fff" />
-          <Text style={styles.metaPillText}>{recentFeedback.skill || 'Coach notes'}</Text>
+        <View style={styles.divider} />
+
+        <View style={styles.titleRow}>
+          <Text style={styles.bigTitle}>{recentFeedback.coachName || 'Coach'}</Text>
         </View>
+
+        <Text style={styles.feedbackText}>{recentFeedback.feedback || '—'}</Text>
       </View>
-
-      <View style={styles.toplineDivider} />
-
-      <View style={styles.feedbackCoachRow}>
-        <Ionicons name="person-circle-outline" size={22} color="#fff" />
-        <Text style={styles.toplineCoach}>{recentFeedback.coachName || 'Coach'}</Text>
+    ) : (
+      <View style={styles.toplineSectionCard}>
+        <Text style={styles.emptyTitle}>No feedback yet</Text>
+        <Text style={styles.emptyBody}>
+          Your coach’s notes will appear here once a session is reviewed.
+        </Text>
       </View>
-
-      <Text style={styles.toplineFeedback}>
-        {recentFeedback.feedback || '—'}
-      </Text>
-    </LinearGradient>
-  </View>
-) : (
-  <View style={styles.cardWrap}>
-    <Text style={styles.emptyTitle}>No feedback yet</Text>
-    <Text style={styles.emptyBody}>Your coach’s notes will appear here once a session is reviewed.</Text>
-  </View>
-)}
+    )}
   </View>
 </>
-
 
 
         {/* Quick Actions */}

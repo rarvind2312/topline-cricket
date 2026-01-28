@@ -815,10 +815,6 @@ linkButtonText: {
   fontWeight: '600',
   color: '#E10600', // Topline red
 },
-errorText: {
-  textAlign: 'center',
-  marginBottom: 10,
-},
 fieldLabel: {
   fontSize: 14,
   fontWeight: '600',
@@ -1416,19 +1412,7 @@ sectionHeaderRow: {
     fontWeight: '800',
     color: '#111',
   },
-
-  pill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: '#FEE2E2', // soft red
-  },
-  pillText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#991B1B',
-    textTransform: 'capitalize',
-  },
+  
 
   metaRow: {
     flexDirection: 'row',
@@ -1733,6 +1717,41 @@ metaPill: {
   paddingHorizontal: 10,
   borderRadius: 999,
 },
+  // --- Video Share Modal / Coach list ---
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 10,
+  },
+
+  listRowSelected: {
+    borderColor: '#8B1D1D',
+    backgroundColor: 'rgba(139, 29, 29, 0.08)',
+  },
+
+  listRowText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+  },
+
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+safeArea:{
+flex: 1,
+backgroundColor: '#fff',
+},
 
 metaPillText: {
   color: '#fff',
@@ -1785,5 +1804,384 @@ pillRow: {
   flexDirection: 'row',
   gap: 10,
   marginTop: 12
-}
+},
+pillText: {
+color:'#7A0A0C',
+fontWeight: '800',
+fontSize: 12,
+},
+recentPillRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 12,
+},
+
+sectionBlock:{
+marginTop: 10,
+},
+
+// ✅ New: reusable “Topline bordered section card”
+  toplineSectionCard :{
+    borderWidth: 1.5,
+    borderColor: '#B31217',
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    padding: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+
+ pill :{
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(179,18,23,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(179,18,23,0.25)',
+  },
+
+  shimmerBox :{
+    height: 84,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    overflow: 'hidden',
+  },
+backBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  backBtnText: { fontWeight: '700' },
+  headerTitle: { fontSize: 18, fontWeight: '800' },
+  uploadBtnTop: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#c81414',
+  },
+  uploadBtnTopText: { color: '#fff', fontWeight: '800' },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  previewBox: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#eee',
+    marginBottom: 12,
+  },
+  // --- Player Videos screen helpers ---
+
+fieldBlock: {
+  marginBottom: 14,
+},
+
+pickerWrap: {
+  borderWidth: 1,
+  borderColor: '#E5E7EB', // light grey
+  borderRadius: 10,
+  overflow: 'hidden',
+  backgroundColor: '#FFFFFF',
+},
+
+videoPreview: {
+  width: '100%',
+  height: 220,
+  borderRadius: 12,
+  backgroundColor: '#000',
+},
+
+// Add these ONLY if they don't already exist in your styles.ts
+
+
+uploadBtn: {
+  paddingVertical: 8,
+  paddingHorizontal: 12,
+  borderRadius: 12,
+  backgroundColor: '#b30000',
+},
+
+uploadBtnText: {
+  color: '#fff',
+  fontWeight: '800',
+},
+
+center: {
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+emptyCard: {
+  borderRadius: 16,
+  borderWidth: 2,
+  borderColor: '#b30000',
+  padding: 16,
+  backgroundColor: '#fff',
+},
+
+
+emptyText: {
+  fontSize: 14,
+  color: '#555',
+},
+
+listContent: {
+  paddingBottom: 24,
+},
+
+videoCard: {
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: '#ddd',
+  padding: 14,
+  marginBottom: 12,
+},
+
+videoTitle: {
+  fontSize: 16,
+  fontWeight: '800',
+  marginBottom: 4,
+},
+
+videoMeta: {
+  fontSize: 13,
+  color: '#666',
+  marginBottom: 10,
+},
+
+// You specifically asked for these 3:
+
+videoNotes: {
+  marginTop: 10,
+  fontSize: 13,
+  color: '#333',
+},
+
+previewWrap: {
+  borderRadius: 16,
+  overflow: 'hidden',
+  backgroundColor: '#ddd',
+  marginBottom: 12,
+},
+
+videoPlaceholder: {
+  width: '100%',
+  height: 190,
+  borderRadius: 14,
+  backgroundColor: '#ddd',
+},
+inputMultiline: {
+  minHeight: 84,
+  textAlignVertical: 'top',
+},
+
+
+pillActive: {
+  backgroundColor: '#b30000',
+},
+
+
+
+pillTextActive: {
+  color: '#fff',
+},
+
+coachList: {
+  backgroundColor: '#fff',
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: '#ddd',
+  overflow: 'hidden',
+},
+
+coachRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingVertical: 12,
+  paddingHorizontal: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#eee',
+},
+
+coachRowSelected: {
+  borderColor: '#b30000',
+},
+
+coachName: {
+  fontSize: 14,
+  fontWeight: '700',
+},
+
+checkMark: {
+  fontSize: 16,
+  fontWeight: '900',
+  color: '#b30000',
+},
+
+modalBtnRow: {
+  flexDirection: 'row',
+  gap: 12,
+  marginTop: 16,
+},
+
+
+
+modalBtnTextSecondary: {
+  fontWeight: '800',
+  color: '#333',
+},
+
+modalBtnTextPrimary: {
+  fontWeight: '900',
+  color: '#fff',
+},
+
+backDashBtn: {
+  marginTop: 14,
+  borderRadius: 14,
+  borderWidth: 2,
+  borderColor: '#b30000',
+  paddingVertical: 14,
+  alignItems: 'center',
+  backgroundColor: '#fff',
+},
+
+backDashBtnText: {
+  fontWeight: '900',
+  color: '#333',
+},
+ sectionSubtitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#444',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+
+  /* ------------------------------
+   * Picker button (Select role / level / state etc.)
+   * ------------------------------ */
+  pickerButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+    marginBottom: 12,
+    justifyContent: 'center',
+  },
+
+  pickerButtonText: {
+    fontSize: 15,
+    color: '#333',
+  },
+
+  pickerPlaceholderText: {
+    fontSize: 15,
+    color: '#999',
+  },
+
+  /* ------------------------------
+   * Modal bullet text (consent modal)
+   * ------------------------------ */
+  modalBullet: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+
+  modalBulletDot: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginRight: 8,
+    color: '#d32f2f', // Topline red
+  },
+
+  modalBulletText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#444',
+  },
+
+  /* ------------------------------
+   * Below-field error text
+   * ------------------------------ */
+  errorText: {
+    color: '#d32f2f',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+logoRow: {
+  flexDirection: 'row',
+  justifyContent: 'flex-end', // pushes logo to right
+  alignItems: 'center',
+  marginBottom: 12,
+},
+
+logoSmall: {
+  width: 42,
+  height: 42,
+  resizeMode: 'contain',
+},
+// Add to your existing styles object (do NOT remove/rename anything you already have)
+
+modalHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+
+modalCloseBtn: {
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 8,
+},
+
+modalCloseText: {
+  fontSize: 18,
+  fontWeight: '700',
+},
+
+modalBulletRow: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  marginBottom: 8,
+},
+consentButton: {
+  marginTop: 12,
+},
+
+consentButtonText: {
+  color: '#C62828',
+  fontSize: 14,
+  fontWeight: '600',
+},
+header: {
+  alignItems: 'center',
+  marginBottom: 16,
+},
+
+title: {
+  fontSize: 22,
+  fontWeight: '700',
+  color: '#111',
+  marginTop: 8,
+},
+
+
 });

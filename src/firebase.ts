@@ -1,12 +1,9 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp, getApps, getApp } from 'firebase/app';
+// src/firebase.ts
+import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, serverTimestamp } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyA2zextrJ42baggK36f-PkCGtaFfdwrFK8",
   authDomain: "topline-cricket.firebaseapp.com",
@@ -16,8 +13,14 @@ const firebaseConfig = {
   appId: "1:1059546000366:web:cecab29fe1e72bbce07cff"
 };
 
-// Initialize Firebase
+
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
+
+// keep your existing helper export
+export { serverTimestamp };
+
 export default app;
