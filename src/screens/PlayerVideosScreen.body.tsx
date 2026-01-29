@@ -80,6 +80,26 @@ const PlayerVideosScreen: React.FC<PlayerVideosProps> = ({ navigation }) => {
   const [recentShared, setRecentShared] = useState<any[]>([]);
 const [loadingRecentShared, setLoadingRecentShared] = useState(false);
 
+const [coachVideos, setCoachVideos] = useState<any[]>([]);
+
+useEffect(() => {
+if (!firebaseUser?.uid) return;
+
+const q = query(
+collection(db, 'videos'),
+where('uploadedBy', '==', 'coach'),
+where('playerId', '==', firebaseUser.uid),
+limit(5)
+);
+
+const unsub = onSnapshot(q, (snap) => {
+const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+setCoachVideos(list);
+});
+
+return () => unsub();
+}, [firebaseUser?.uid]);
+
   useEffect(() => {
     const loadCoaches = async () => {
       try {
@@ -444,6 +464,34 @@ const [loadingRecentShared, setLoadingRecentShared] = useState(false);
               );
             })}
           </View>
+        )}
+
+          {coachVideos.length > 0 && (
+        <View style={{ marginTop: 24 }}>
+        <Text style={styles.sectionTitle}>Videos from Coach</Text>
+
+        {coachVideos.map((v, i) => (
+        <View key={v.id} style={styles.videoItemCard}>
+        <Text style={styles.videoItemTitle}>
+        Coach: {v.coachName}
+        </Text>
+
+        <Video
+        source={{ uri: v.videoUrl }}
+        style={styles.videoPlayer}
+        useNativeControls
+        resizeMode={ResizeMode.CONTAIN}
+        />
+
+        {v.notes ? (
+        <Text style={styles.playerWelcomeSubText}>
+        ￼
+         {v.notes}
+        </Text>
+        ) : null}
+        </View>
+        ))}
+        </View>
         )}
 
     
