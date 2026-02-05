@@ -808,7 +808,16 @@ linkButton: {
   marginTop: 16,
   paddingVertical: 6,
 },
-
+textInput: {
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',   // same neutral border used elsewhere
+  borderRadius: 8,
+  paddingHorizontal: 12,
+  paddingVertical: 10,
+  fontSize: 14,
+  color: '#111827',
+},
 /* Link button text */
 linkButtonText: {
   fontSize: 14,
@@ -1921,14 +1930,6 @@ center: {
   justifyContent: 'center',
 },
 
-emptyCard: {
-  borderRadius: 16,
-  borderWidth: 2,
-  borderColor: '#b30000',
-  padding: 16,
-  backgroundColor: '#fff',
-},
-
 
 emptyText: {
   fontSize: 14,
@@ -1937,15 +1938,6 @@ emptyText: {
 
 listContent: {
   paddingBottom: 24,
-},
-
-videoCard: {
-  backgroundColor: '#fff',
-  borderRadius: 16,
-  borderWidth: 1,
-  borderColor: '#ddd',
-  padding: 14,
-  marginBottom: 12,
 },
 
 videoTitle: {
@@ -2182,6 +2174,316 @@ title: {
   color: '#111',
   marginTop: 8,
 },
+ 
+  subtitle: { fontSize: 15, color: "#666", marginTop: 6 },
+
+  backButton: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#b71c1c",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  backButtonText: { color: "#111", fontWeight: "700" },
+
+  tabRow: { flexDirection: "row", gap: 10, marginTop: 14 },
+  tabPill: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#b71c1c",
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  tabPillActive: { backgroundColor: "#b71c1c" },
+
+  // ✅ you asked for these
+  coachPillText: { color: "#b71c1c", fontWeight: "800" },
+  coachPillTextActive: { color: "#fff", fontWeight: "800" },
+
+  segmentRow: { flexDirection: "row", gap: 10, marginTop: 14 },
+  segmentPill: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  segmentPillActive: { backgroundColor: "#b71c1c", borderColor: "#b71c1c" },
+  segmentText: { color: "#333", fontWeight: "700" },
+  segmentTextActive: { color: "#fff", fontWeight: "800" },
+
+  emptyCard: {
+    marginTop: 14,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#eee",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
 
 
-});
+  videoCard: {
+    marginTop: 12,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#eee",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  videoCardRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  videoMetaSmall: { color: "#888", marginTop: 6, fontSize: 12 },
+  videoLink: { color: "#b71c1c", marginTop: 8, fontWeight: "700" },
+
+  statusPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  statusPending: { backgroundColor: "#fde2e2" },
+  statusReviewed: { backgroundColor: "#e3f7e7" },
+  statusText: { fontWeight: "800" },
+  statusTextPending: { color: "#b71c1c" },
+  statusTextReviewed: { color: "#1b5e20" },
+
+  
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  modalClose: { color: "#b71c1c", fontWeight: "800" },
+  modalVideo: { width: "100%", height: 220, marginTop: 12, borderRadius: 12 },
+  
+  uploadBigButton: {
+    marginTop: 14,
+    backgroundColor: "#b71c1c",
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  uploadBigButtonText: { color: "#fff", fontWeight: "900", fontSize: 16 },
+  uploadSubText: { marginTop: 6, color: "rgba(255,255,255,0.85)", fontWeight: "700" },
+
+  previewCard: {
+    marginTop: 12,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: "#000",
+  },
+  previewVideo: { width: "100%", height: 220 },
+
+  formCard: {
+    marginTop: 12,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  formLabel: { fontWeight: "900", color: "#111", marginBottom: 10 },
+
+  playerList: {
+    borderWidth: 1,
+    borderColor: "#f0caca",
+    borderRadius: 14,
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  playerRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3e1e1",
+    backgroundColor: "#fff",
+  },
+  playerRowActive: { backgroundColor: "#fde2e2" },
+  playerRowText: { color: "#b71c1c", fontWeight: "800" },
+  playerRowTextActive: { color: "#b71c1c", fontWeight: "900" },
+
+  
+  videoCardTitle: { fontSize: 16, fontWeight: "900", color: "#111" },
+  
+
+  video: { width: "100%", height: 220, marginTop: 10, borderRadius: 12 },
+
+
+  modalScreen: { flex: 1, backgroundColor: "#fff" },
+  modalContent: { padding: 16, paddingBottom: 28 },
+  // ---------- Coach pills ----------
+coachTabPillInactive: {
+  flex: 1,
+  height: 44,
+  borderRadius: 22,
+  backgroundColor: "#FFFFFF",
+  borderWidth: 1.5,
+  borderColor: "#E5E7EB",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+coachPillTextInactive: {
+  color: "#6B7280",
+  fontSize: 15,
+  fontWeight: "700",
+},
+
+// ---------- Generic helpers ----------
+centered: {
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+// ---------- Video card ----------
+videoCardHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: 6,
+},
+
+videoCardName: {
+  fontSize: 17,
+  fontWeight: "800",
+  color: "#111827",
+},
+
+videoCardMeta: {
+  fontSize: 13,
+  color: "#6B7280",
+  marginTop: 2,
+},
+
+videoCardAction: {
+  marginTop: 6,
+  fontSize: 14,
+  fontWeight: "700",
+  color: "#B91C1C",
+},
+
+// ---------- Modal ----------
+modalContainer: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 18,
+  padding: 16,
+  marginHorizontal: 20,
+},
+
+modalSectionTitle: {
+  fontSize: 18,
+  fontWeight: "800",
+  color: "#111827",
+  marginBottom: 10,
+},
+
+modalTextArea: {
+  minHeight: 90,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: "#E5E7EB",
+  backgroundColor: "#FFFFFF",
+  paddingHorizontal: 12,
+  paddingTop: 12,
+  fontSize: 15,
+  color: "#111827",
+  textAlignVertical: "top",
+},
+
+// ---------- Video preview ----------
+videoPreviewPlaceholder: {
+  height: 220,
+  borderRadius: 16,
+  backgroundColor: "#000000",
+  alignItems: "center",
+  justifyContent: "center",
+  marginVertical: 10,
+},
+
+videoPreviewPlaceholderText: {
+  color: "#FFFFFF",
+  fontSize: 14,
+  fontWeight: "700",
+},
+
+// ---------- Upload ----------
+uploadButton: {
+  height: 48,
+  borderRadius: 16,
+  backgroundColor: "#B91C1C",
+  alignItems: "center",
+  justifyContent: "center",
+  marginTop: 12,
+},
+
+uploadButtonText: {
+  color: "#FFFFFF",
+  fontSize: 15,
+  fontWeight: "800",
+},
+
+uploadCountText: {
+  marginTop: 6,
+  fontSize: 13,
+  color: "#6B7280",
+  textAlign: "center",
+},
+
+// ---------- Picker ----------
+pickerWrapper: {
+  borderWidth: 1,
+  borderColor: "#E5E7EB",
+  borderRadius: 14,
+  backgroundColor: "#FFFFFF",
+  marginBottom: 10,
+  overflow: "hidden",
+},
+
+picker: {
+  height: 46,
+  width: "100%",
+},
+// ---------- Disabled confirm button ----------
+confirmButtonDisabled: {
+  backgroundColor: "#F3F4F6",        // light grey
+  borderColor: "#E5E7EB",
+  borderWidth: 1,
+  opacity: 0.6,
+},
+
+// ---------- Upload video card / button ----------
+uploadedVideo: {
+  height: 52,
+  borderRadius: 16,
+  backgroundColor: "#B91C1C",        // Topline red
+  alignItems: "center",
+  justifyContent: "center",
+  marginVertical: 10,
+},
+
+// ---------- Textarea ----------
+textArea: {
+  minHeight: 100,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: "#E5E7EB",
+  backgroundColor: "#FFFFFF",
+  paddingHorizontal: 12,
+  paddingTop: 12,
+  fontSize: 15,
+  color: "#111827",
+  textAlignVertical: "top",
+},
+  });

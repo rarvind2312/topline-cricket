@@ -1,16 +1,15 @@
-// src/context/AuthContext.tsx
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '../firebase';
-import type { AppUserProfile, User } from '../types';
-import { getUserProfile, upsertUserProfile } from '../services/userProfile';
-import { logoutAuth } from '../services/authServices';
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { auth } from "../firebase";
+import type { AppUserProfile, User } from "../types";
+import { getUserProfile, upsertUserProfile } from "../services/userProfile";
+import { logoutAuth } from "../services/authServices";
+import { initPushForUser } from "../utils/notifications";
 
 type AuthContextType = {
   firebaseUser: FirebaseUser | null;
   profile: AppUserProfile | null;
 
-  // Backward-compatible aliases (so your screens using user/setUser don’t explode)
   user: AppUserProfile | null;
   setUser: (u: User | null) => Promise<void>;
 
@@ -23,7 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within <AuthProvider>');
+  if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
   return ctx;
 };
 
@@ -41,15 +40,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(p);
   };
 
-  // Backward compatible: setUser(User|null)
-  // - If logged in: merges into existing profile and persists to Firestore
-  // - If null: clears local profile
   const setUser = async (u: User | null) => {
-    if (!firebaseUser) {
-      setProfile(null);
-      return;
-    }
-    if (!u) {
+    if (!firebaseUser || !u) {
       setProfile(null);
       return;
     }
@@ -59,7 +51,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uid: firebaseUser.uid,
       createdAt: nowIso,
       updatedAt: nowIso,
-      // fallback required fields if profile was missing
       role: u.role,
       firstName: u.firstName,
       lastName: u.lastName,
@@ -75,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setProfile(merged);
-    await upsertUserProfile(firebaseUser.uid,merged);
+    await upsertUserProfile(firebaseUser.uid, merged);
   };
 
   useEffect(() => {
@@ -88,13 +79,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      const p = await getUserProfile(u.uid);
-      setProfile(p);
-      setLoading(false);
+      setLoading(true);
+      try {
+        const p = await getUserProfile(u.uid);
+        setProfile(p);
+      } finally {
+        setLoading(false);
+      }
     });
 
     return unsub;
   }, []);
+
+  // ✅ Push init: only after we have uid + profile (non-blocking)
+  useEffect(() => {
+    const uid = firebaseUser?.uid;
+    if (!uid) return;
+    if (!profile) return;
+
+    initPushForUser(uid).catch((e) =>
+      console.log("initPushForUser failed (non-blocking):", e)
+    );
+  }, [firebaseUser?.uid, profile]);
 
   const logout = async () => {
     await logoutAuth();

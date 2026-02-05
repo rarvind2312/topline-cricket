@@ -1,591 +1,559 @@
+// PlayerFitnessScreenBody.tsx
+// ✅ FIXES ADDED:
+// 1) Coach-assigned drills AUTO-MOVE to Completed when player submits (single update to the same fitnessEntries doc).
+// 2) History now includes BOTH:
+//    - player-created entries (source='player')
+//    - coach-assigned entries that the player completed (source='coach' + status='completed')
+// 3) Button text updated to "Submit (Auto-complete)" to reflect the behaviour.
+// ✅ DATE FORMAT FIX:
+// - Uses shared utils from ../utils/dateFormat for consistent labels.
+
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   SafeAreaView,
   ScrollView,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
-  Image,
+  TouchableOpacity,
+  Alert,
+  TextInput,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 
-import { Picker } from '@react-native-picker/picker';
-
 import { styles } from '../styles/styles';
-import type { PlayerFitnessProps } from './PlayerFitnessScreen';
-import type { FitnessEntry } from '../types';
-
 import { useAuth } from '../context/AuthContext';
 import { db, serverTimestamp } from '../firebase';
 
 import {
   addDoc,
   collection,
-  getDocs,
+  doc,
   limit,
+  onSnapshot,
   orderBy,
   query,
+  updateDoc,
   where,
-  Timestamp,
-  onSnapshot,
 } from 'firebase/firestore';
 
-const MAX_SETS = 50;
-const MAX_REPS = 500;
-const MAX_EXERCISES_PER_SUBMIT = 5;
-const DAYS_TO_SHOW = 14;
+// ✅ shared date utils
+import { safeToDate, formatDayDateTime } from '../utils/dateFormatter';
 
-type CoachLite = { id: string; name: string };
-type DraftExercise = { description: string; sets: number; reps: number };
+type Drill = { drill: string; reps: string; sets: string; notes: string };
 
+type FitnessEntry = {
+  id: string;
+  playerId: string;
+  playerName: string;
 
-const TOPLINE_LOGO = require('../../assets/topline-cricket-image.jpg');
-const PlayerFitnessScreenBody: React.FC<PlayerFitnessProps> = ({ navigation }) => {
-  const { firebaseUser, profile } = useAuth();
+  coachId?: string | null;
+  coachName?: string | null;
+
+  drills: Drill[];
+
+  source: 'coach' | 'player';
+  status: 'assigned' | 'submitted' | 'completed';
+
+  sharedToCoach?: boolean;
+
+  createdAtMs?: number;
+  createdAtLabel?: string;
+  completedAtMs?: number | null;
+  completedAtLabel?: string | null;
+
+  // optional metadata
+  completedByPlayerId?: string | null;
+  completedByPlayerName?: string | null;
+};
+
+const MAX_DRILLS = 5;
+const emptyDrill = (): Drill => ({ drill: '', reps: '', sets: '', notes: '' });
+type Tab = 'coach' | 'self';
+
+export default function PlayerFitnessScreenBody({ navigation }: any) {
+  const { firebaseUser, user } = useAuth();
   const uid = firebaseUser?.uid || '';
 
   const playerName = useMemo(() => {
-    const fn = (profile as any)?.firstName || '';
-    const ln = (profile as any)?.lastName || '';
+    const fn = (user as any)?.firstName || '';
+    const ln = (user as any)?.lastName || '';
     const full = `${fn} ${ln}`.trim();
-    return full || (profile as any)?.email || 'Player';
-  }, [profile]);
+    return full || (user as any)?.email || 'Player';
+  }, [user]);
 
-  const [description, setDescription] = useState('');
-  const [sets, setSets] = useState('');
-  const [reps, setReps] = useState('');
+  // Optional: preferred coach in player profile
+  const preferredCoachId = (user as any)?.coachId || '';
+  const preferredCoachName =
+    (user as any)?.coachName ||
+    (user as any)?.assignedCoachName ||
+    'Coach';
 
-  // ✅ Firebase-backed entries (last 14 days)
-  const [entries, setEntries] = useState<FitnessEntry[]>([]);
+  const [tab, setTab] = useState<Tab>('coach');
 
-  // ✅ Coach requested toggle + coach list
-  const [coachRequested, setCoachRequested] = useState(false);
-  const [coaches, setCoaches] = useState<CoachLite[]>([]);
-  const [loadingCoaches, setLoadingCoaches] = useState(false);
-  const [selectedCoachId, setSelectedCoachId] = useState<string>('');
+  // Coach assigned ACTIVE entries (player sees these)
+  const [coachAssigned, setCoachAssigned] = useState<FitnessEntry[]>([]);
 
-  const coachNameById = (coachId: string) =>
-    coaches.find((c) => c.id === coachId)?.name ?? '';
+  // History entries (player-created + completed coach-assigned)
+  const [historyEntries, setHistoryEntries] = useState<FitnessEntry[]>([]);
 
-  
-  // -----------------------------
-  // Player Fitness Entry
-  // -----------------------------
+  // Self performed form
+  const [shareToCoach, setShareToCoach] = useState(true);
+  const [drills, setDrills] = useState<Drill[]>([emptyDrill()]);
 
+  const updateDrill = (index: number, patch: Partial<Drill>) => {
+    setDrills(prev => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)));
+  };
 
-  const resetInput = () => {
-  setDescription('');
-  setSets('');
-  setReps('');
-};
-const [draftExercises, setDraftExercises] = useState<DraftExercise[]>([]);
-const addDraftExercise = () => {
-  const trimmedDesc = description.trim();
-  const setsNum = Number(sets);
-  const repsNum = Number(reps);
+  const addMoreDrill = () => {
+    setDrills(prev => (prev.length >= MAX_DRILLS ? prev : [...prev, emptyDrill()]));
+  };
 
-  if (!trimmedDesc) {
-    Alert.alert('Missing exercise', 'Please enter an exercise name/description.');
-    return;
-  }
-  if (!Number.isFinite(setsNum) || setsNum <= 0 || setsNum > MAX_SETS) {
-    Alert.alert('Invalid sets', `Please enter sets between 1 and ${MAX_SETS}.`);
-    return;
-  }
-  if (!Number.isFinite(repsNum) || repsNum <= 0 || repsNum > MAX_REPS) {
-    Alert.alert('Invalid reps', `Please enter reps between 1 and ${MAX_REPS}.`);
-    return;
-  }
-
-  if (draftExercises.length >= MAX_EXERCISES_PER_SUBMIT) {
-    Alert.alert(
-      'Limit reached',
-      `You can add up to ${MAX_EXERCISES_PER_SUBMIT} exercises per submission.`
-    );
-    return;
-  }
-
-  setDraftExercises((prev) => [...prev, { description: trimmedDesc, sets: setsNum, reps: repsNum }]);
-  resetInput();
-};
-
-const removeDraftExercise = (idx: number) => {
-  setDraftExercises((prev) => prev.filter((_, i) => i !== idx));
-};
-
-  // -----------------------------
-  // Load coaches (role == coach)
-  // -----------------------------
-  useEffect(() => {
-    const loadCoaches = async () => {
-      try {
-        setLoadingCoaches(true);
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('role', '==', 'coach'), limit(50));
-        const snap = await getDocs(q);
-
-        const list: CoachLite[] = snap.docs.map((d) => {
-          const data = d.data() as any;
-          const name =
-            `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim() ||
-            data.email ||
-            'Coach';
-          return { id: d.id, name };
-        });
-
-        list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        setCoaches(list);
-      } catch (e) {
-        console.log('Load coaches error:', e);
-      } finally {
-        setLoadingCoaches(false);
-      }
-    };
-
-    loadCoaches();
-  }, []);
+  const removeDrill = (index: number) => {
+    setDrills(prev => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
 
   useEffect(() => {
-  if (!uid) return;
-
-  const refCol = collection(db, 'fitnessEntries');
-
-  const q = query(
-    refCol,
-    where('playerId', '==', uid),
-    orderBy('createdAt', 'desc'),
-    limit(5)
-  );
-
-  const unsub = onSnapshot(
-    q,
-    (snap) => {
-      const list = snap.docs.map((d) => {
-        const data: any = d.data();
-
-        // createdAt might be Firestore Timestamp
-        const createdAtMs =
-          data?.createdAt?.toMillis?.() ??
-          (typeof data?.createdAt === 'number' ? data.createdAt : Date.now());
-
-        return {
-          id: d.id,
-          createdAt: createdAtMs,
-          dateKey: data.dateKey || '',
-          dateLabel: data.dateLabel || '',
-          description: data.description || '',
-          sets: Number(data.sets || 0),
-          reps: Number(data.reps || 0),
-        };
-      });
-
-      setEntries(list);
-    },
-    (err) => {
-      console.log('fitnessEntries listener error:', err);
+    // If no coach linked, force self-only
+    if (!preferredCoachId) {
+      setShareToCoach(false);
     }
-  );
+  }, [preferredCoachId]);
 
-  return () => unsub();
-}, [uid]);
-
-
-  // -----------------------------
-  // Load last 14 days fitness entries for this player
-  // -----------------------------
+  // ✅ ONE listener: all entries for player, then filter client-side
   useEffect(() => {
-    const loadRecentFitness = async () => {
-      try {
-        if (!uid) return;
+    if (!uid) return;
 
-        const sinceMs = Date.now() - DAYS_TO_SHOW * 24 * 60 * 60 * 1000;
-        const since = Timestamp.fromMillis(sinceMs);
+    const qAll = query(
+      collection(db, 'fitnessEntries'),
+      where('playerId', '==', uid),
+      orderBy('createdAtMs', 'desc'),
+      limit(120)
+    );
 
-        const refCol = collection(db, 'fitnessEntries');
-        const q = query(
-          refCol,
-          where('playerId', '==', uid),
-          where('createdAt', '>=', since),
-          orderBy('createdAt', 'desc')
-        );
+    const unsub = onSnapshot(
+      qAll,
+      snap => {
+        const rows: FitnessEntry[] = snap.docs.map(d => {
+          const data: any = d.data();
 
-        const snap = await getDocs(q);
+          // ✅ Consistent labels using shared safeToDate + formatDayDateTime
+          const createdDt =
+            safeToDate(data?.createdAt) ||
+            safeToDate(data?.createdAtMs) ||
+            (data?.createdAtLabel ? safeToDate(String(data.createdAtLabel)) : null);
 
-        const list: FitnessEntry[] = snap.docs.map((d) => {
-          const data = d.data() as any;
+          const completedDt =
+            safeToDate(data?.completedAt) ||
+            safeToDate(data?.completedAtMs) ||
+            (data?.completedAtLabel ? safeToDate(String(data.completedAtLabel)) : null);
 
-          // createdAt in Firestore is Timestamp; normalize to number for your UI grouping logic
-          const createdAtMs =
-            typeof data.createdAt?.toMillis === 'function'
-              ? data.createdAt.toMillis()
-              : Date.now();
+          const createdAtLabel = createdDt ? formatDayDateTime(createdDt) : (data?.createdAtLabel ? String(data.createdAtLabel) : '');
+          const completedAtLabel = completedDt ? formatDayDateTime(completedDt) : (data?.completedAtLabel ? String(data.completedAtLabel) : '');
 
           return {
             id: d.id,
-            createdAt: createdAtMs,
-            dateKey: data.dateKey || new Date(createdAtMs).toISOString().slice(0, 10),
-            dateLabel:
-              data.dateLabel || new Date(createdAtMs).toLocaleDateString(),
-            description: data.description || '',
-            sets: Number(data.sets || 0),
-            reps: Number(data.reps || 0),
+            playerId: data.playerId,
+            playerName: data.playerName || '',
+            coachId: data.coachId ?? null,
+            coachName: data.coachName ?? null,
+            drills: Array.isArray(data.drills) ? data.drills : [],
+            source: (data.source || 'player') as 'coach' | 'player',
+            status: (data.status || 'assigned') as 'assigned' | 'submitted' | 'completed',
+            sharedToCoach: !!data.sharedToCoach,
+            createdAtMs: data.createdAtMs,
+            createdAtLabel,
+            completedAtMs: data.completedAtMs ?? null,
+            completedAtLabel: completedAtLabel || null,
+            completedByPlayerId: data?.completedByPlayerId ?? null,
+            completedByPlayerName: data?.completedByPlayerName ?? null,
           };
         });
 
-        setEntries(list);
-      } catch (e) {
-        console.log('Load fitness error:', e);
-      }
-    };
+        // ✅ Coach Assigned tab: only coach->assigned (ACTIVE)
+        const assigned = rows.filter(r => r.source === 'coach' && r.status === 'assigned');
+        setCoachAssigned(assigned);
 
-    loadRecentFitness();
+        // ✅ History:
+        // - all player created entries (source=player)
+        // - AND coach assigned entries that the player completed (source=coach + completed)
+        const history = rows.filter(
+          r => r.source === 'player' || (r.source === 'coach' && r.status === 'completed')
+        );
+        setHistoryEntries(history);
+      },
+      err => console.log('PlayerFitness listener error:', err)
+    );
+
+    return () => unsub();
   }, [uid]);
 
-  const handleAddEntry = async () => {
-  if (!uid) {
-    Alert.alert('Not signed in', 'Please sign in again.');
-    return;
-  }
-
-  // If user forgot to press "Add more" for the current typed row,
-  // we can auto-add it ONLY if any field is filled.
-  const hasTypedRow = description.trim() || sets.trim() || reps.trim();
-  let batchExercises = [...draftExercises];
-
-  if (hasTypedRow) {
-    const trimmedDesc = description.trim();
-    const setsNum = Number(sets);
-    const repsNum = Number(reps);
-
-    if (!trimmedDesc) {
-      Alert.alert('Missing exercise', 'Please enter an exercise name/description.');
-      return;
-    }
-    if (!Number.isFinite(setsNum) || setsNum <= 0 || setsNum > MAX_SETS) {
-      Alert.alert('Invalid sets', `Please enter sets between 1 and ${MAX_SETS}.`);
-      return;
-    }
-    if (!Number.isFinite(repsNum) || repsNum <= 0 || repsNum > MAX_REPS) {
-      Alert.alert('Invalid reps', `Please enter reps between 1 and ${MAX_REPS}.`);
-      return;
+  const validateSelf = () => {
+    if (!uid) {
+      Alert.alert('Not signed in', 'Please sign in again.');
+      return false;
     }
 
-    if (batchExercises.length >= MAX_EXERCISES_PER_SUBMIT) {
-      Alert.alert(
-        'Limit reached',
-        `You can add up to ${MAX_EXERCISES_PER_SUBMIT} exercises per submission.`
-      );
-      return;
+    const cleaned = drills
+      .map(d => ({
+        drill: (d.drill || '').trim(),
+        reps: (d.reps || '').trim(),
+        sets: (d.sets || '').trim(),
+        notes: (d.notes || '').trim(),
+      }))
+      .filter(d => d.drill.length > 0);
+
+    if (cleaned.length === 0) {
+      Alert.alert('Add at least 1 drill', 'Please enter a drill name.');
+      return false;
     }
 
-    batchExercises = [...batchExercises, { description: trimmedDesc, sets: setsNum, reps: repsNum }];
-  }
+    if (shareToCoach && !preferredCoachId) {
+      // Auto-fallback instead of blocking
+      setShareToCoach(false);
+    }
 
-  if (batchExercises.length === 0) {
-    Alert.alert('No exercises', 'Please add at least one exercise.');
-    return;
-  }
+    return true;
+  };
 
-  if (coachRequested && !selectedCoachId) {
-    Alert.alert('Select coach', 'Please choose a coach to submit this to.');
-    return;
-  }
+  const saveSelfPerformed = async () => {
+    if (!validateSelf()) return;
 
-  const now = Date.now();
-  const today = new Date();
-  const dateKey = today.toISOString().slice(0, 10);
-  const dateLabel = today.toLocaleDateString();
+    const cleaned = drills
+      .map(d => ({
+        drill: (d.drill || '').trim(),
+        reps: (d.reps || '').trim(),
+        sets: (d.sets || '').trim(),
+        notes: (d.notes || '').trim(),
+      }))
+      .filter(d => d.drill.length > 0);
 
-  try {
-    const coachName = coachRequested ? coachNameById(selectedCoachId) : '';
+    const now = new Date();
+    const createdAtLabel = formatDayDateTime(now); // ✅ consistent
+    const createdAtMs = Date.now();
 
-    // Save each exercise as a separate doc (simplest + works with your history UI)
-    const writes = batchExercises.map((ex) =>
-      addDoc(collection(db, 'fitnessEntries'), {
+    try {
+      const willShare = !!shareToCoach;
+
+      await addDoc(collection(db, 'fitnessEntries'), {
         playerId: uid,
         playerName,
 
-        coachRequested: !!coachRequested,
-        coachId: coachRequested ? selectedCoachId : '',
-        coachName: coachRequested ? coachName : '',
+        coachId: willShare ? preferredCoachId : null,
+        coachName: willShare ? preferredCoachName : null,
 
-        description: ex.description,
-        sets: ex.sets,
-        reps: ex.reps,
-
-        dateKey,
-        dateLabel,
+        drills: cleaned,
+        source: 'player',
+        status: willShare ? 'submitted' : 'completed',
+        sharedToCoach: willShare,
 
         createdAt: serverTimestamp(),
-        status: coachRequested ? 'submitted' : 'self',
-      })
-    );
+        createdAtMs,
+        createdAtLabel,
 
-    await Promise.all(writes);
+        completedAt: willShare ? null : serverTimestamp(),
+        completedAtMs: willShare ? null : createdAtMs,
+        completedAtLabel: willShare ? null : createdAtLabel,
+      });
 
-    // Add to local list instantly (keeps UI responsive)
-    const newEntries: FitnessEntry[] = batchExercises.map((ex, i) => ({
-      id: `${now}_${i}`,
-      createdAt: now - i, // small ordering nudge
-      dateKey,
-      dateLabel,
-      description: ex.description,
-      sets: ex.sets,
-      reps: ex.reps,
-    }));
+      Alert.alert(
+        'Saved',
+        willShare
+          ? `Submitted to coach (${preferredCoachName}).`
+          : 'Saved for self training.'
+      );
 
-    setEntries((prev) => [...newEntries, ...prev]);
-
-    // Clear
-    setDraftExercises([]);
-    resetInput();
-
-    Alert.alert(
-      'Saved',
-      coachRequested ? 'Submitted to coach.' : 'Saved to your history.'
-    );
-  } catch (e: any) {
-    console.log('Save fitness failed:', e);
-    Alert.alert('Save failed', e?.message || 'Could not save to Firebase.');
-  }
-};
-
-  // group entries by dateKey (your existing logic)
-  const entriesByDate = useMemo(() => {
-    const map: Record<string, FitnessEntry[]> = {};
-    for (const e of entries) {
-      if (!map[e.dateKey]) map[e.dateKey] = [];
-      map[e.dateKey].push(e);
+      setDrills([emptyDrill()]);
+    } catch (e: any) {
+      console.log('Save self performed error:', e);
+      Alert.alert('Failed', e?.message || 'Could not save drills.');
     }
-    Object.keys(map).forEach((k) => {
-      map[k].sort((a, b) => b.createdAt - a.createdAt);
-    });
-    return map;
-  }, [entries]);
+  };
 
-  const orderedDates = useMemo(() => {
-    return Object.keys(entriesByDate).sort((a, b) => (a < b ? 1 : -1));
-  }, [entriesByDate]);
+  // ✅ FIX: Player "submit" of coach-assigned drill = auto-move to completed
+  const submitAssignedAndAutoComplete = async (entry: FitnessEntry) => {
+    if (!uid || !entry?.id) return;
 
-  // summary (same logic)
-  const totalExercises = entries.length;
-  const totalDays = orderedDates.length;
-  const totalSets = entries.reduce((sum, e) => sum + e.sets, 0);
-  const totalReps = entries.reduce((sum, e) => sum + e.reps, 0);
+    try {
+      Alert.alert(
+        'Submit & complete?',
+        'This will move the coach-assigned drills to Completed.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Submit',
+            style: 'default',
+            onPress: async () => {
+              const now = new Date();
 
-  const badges: string[] = [];
-  if (totalDays >= 3) badges.push('3+ active days');
-  if (totalExercises >= 10) badges.push('10+ exercises logged');
-  if (totalReps >= 300) badges.push('300+ reps completed');
+              await updateDoc(doc(db, 'fitnessEntries', entry.id), {
+                status: 'completed',
+                completedAt: serverTimestamp(),
+                completedAtMs: Date.now(),
+                completedAtLabel: formatDayDateTime(now), // ✅ consistent
+                completedByPlayerId: uid,
+                completedByPlayerName: playerName,
+              });
+
+              // No manual state changes needed—listener will move it from coachAssigned -> history
+              Alert.alert('Done', 'Moved to Completed.');
+            },
+          },
+        ]
+      );
+    } catch (e: any) {
+      console.log('Auto-complete error:', e);
+      Alert.alert('Failed', e?.message || 'Could not update.');
+    }
+  };
+
+  // ✅ Red segmented toggle (like signup)
+  const SegToggle = ({
+    leftLabel,
+    rightLabel,
+    leftActive,
+    onLeft,
+    onRight,
+  }: {
+    leftLabel: string;
+    rightLabel: string;
+    leftActive: boolean;
+    onLeft: () => void;
+    onRight: () => void;
+  }) => {
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          backgroundColor: '#c62828',
+          borderRadius: 12,
+          padding: 4,
+          marginTop: 14,
+        }}
+      >
+        <TouchableOpacity
+          onPress={onLeft}
+          style={{
+            flex: 1,
+            paddingVertical: 12,
+            borderRadius: 10,
+            backgroundColor: leftActive ? '#ffffff' : 'transparent',
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ fontWeight: '700', color: leftActive ? '#c62828' : '#ffffff' }}>
+            {leftLabel}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={onRight}
+          style={{
+            flex: 1,
+            paddingVertical: 12,
+            borderRadius: 10,
+            backgroundColor: leftActive ? 'transparent' : '#ffffff',
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ fontWeight: '700', color: leftActive ? '#ffffff' : '#c62828' }}>
+            {rightLabel}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const lastTwoHistory = historyEntries.slice(0, 2);
 
   return (
     <SafeAreaView style={styles.screenContainer}>
-      <ScrollView contentContainerStyle={styles.formScroll}>
-        <Text style={styles.sectionTitle}>Fitness Log</Text>
-<Image source={TOPLINE_LOGO} style={[styles.headerLogo, {alignSelf:'flex-end'}]} />
-        <Text style={styles.playerWelcomeSubText}>
-          Log your basic fitness work: exercise name, sets and reps.
-          {'\n'}Showing last {DAYS_TO_SHOW} days.
-        </Text>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.formScroll} keyboardShouldPersistTaps="handled">
+          <Text style={styles.playerWelcomeSubText}>
+            Track fitness drills assigned by coach, or log your own training.
+          </Text>
 
-        {/* Summary */}
-        {entries.length > 0 && (
-          <View style={styles.playerCard}>
-            <Text style={styles.playerCardTitle}>Summary</Text>
-
-            <Text style={styles.playerCardBodyText}>Days trained: {totalDays}</Text>
-            <Text style={styles.playerCardBodyText}>Exercises logged: {totalExercises}</Text>
-            <Text style={styles.playerCardBodyText}>
-              Total volume: {totalSets} sets · {totalReps} reps
-            </Text>
-
-            {badges.length > 0 && (
-              <View style={styles.fitnessBadgesRow}>
-                {badges.map((badge) => (
-                  <View key={badge} style={styles.fitnessBadge}>
-                    <Text style={styles.fitnessBadgeText}>{badge}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Input */}
-        <View style={styles.playerCard}>
-          <Text style={styles.statsLabel}>Exercise / Description</Text>
-          <TextInput
-            style={styles.statsInput}
-            placeholder="e.g. Push Ups, Squats, Sprints"
-            value={description}
-            onChangeText={setDescription}
+          <SegToggle
+            leftLabel="Coach Assigned"
+            rightLabel="Self Performed"
+            leftActive={tab === 'coach'}
+            onLeft={() => setTab('coach')}
+            onRight={() => setTab('self')}
           />
 
-          <View style={{ flexDirection: 'row', marginTop: 10 }}>
-            <View style={{ flex: 1, marginRight: 8 }}>
-              <Text style={styles.statsLabel}>Sets</Text>
-              <TextInput
-                style={styles.statsInput}
-                placeholder="e.g. 3"
-                value={sets}
-                onChangeText={setSets}
-                keyboardType="number-pad"
-              />
-            </View>
+          {/* ---------------- Coach Assigned ---------------- */}
+          {tab === 'coach' ? (
+            <>
+              <Text style={[styles.sectionTitle, { marginTop: 18 }]}>
+                Coach Suggested Fitness Drills
+              </Text>
 
-            <View style={{ flex: 1, marginLeft: 8 }}>
-              <Text style={styles.statsLabel}>Reps</Text>
-              <TextInput
-                style={styles.statsInput}
-                placeholder="e.g. 12 (or seconds)"
-                value={reps}
-                onChangeText={setReps}
-                keyboardType="number-pad"
-              />
-            </View>
-          </View>
+              <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
+                {coachAssigned.length === 0 ? (
+                  <Text style={styles.emptyBody}>No drills assigned by coach yet.</Text>
+                ) : (
+                  coachAssigned.map(entry => (
+                    <View key={entry.id} style={{ marginTop: 12 }}>
+                      <Text style={styles.inputLabel}>
+                        {(entry.coachName || 'Coach')}{' '}
+                        {entry.createdAtLabel ? `• Assigned ${entry.createdAtLabel}` : ''}
+                      </Text>
 
-{/* Draft exercises list (max 5) */}
-{draftExercises.length > 0 ? (
-  <View style={{ marginTop: 12 }}>
-    <Text style={styles.statsLabel}>
-      Exercises to submit ({draftExercises.length}/{MAX_EXERCISES_PER_SUBMIT})
-    </Text>
+                      {entry.drills.slice(0, MAX_DRILLS).map((d, i) => (
+                        <Text key={i} style={styles.playerWelcomeSubText}>
+                          • {d.drill}
+                          {d.reps ? ` — Reps: ${d.reps}` : ''}
+                          {d.sets ? `, Sets: ${d.sets}` : ''}
+                        </Text>
+                      ))}
 
-    {draftExercises.map((ex, idx) => (
-      <View key={`${ex.description}_${idx}`} style={styles.fitnessTableRow}>
-        <Text style={[styles.fitnessTableCellText, { flex: 2 }]} numberOfLines={1}>
-          {ex.description}
-        </Text>
-        <Text style={[styles.fitnessTableCellText, { flex: 1, textAlign: 'center' }]}>
-          {ex.sets}
-        </Text>
-        <Text style={[styles.fitnessTableCellText, { flex: 1, textAlign: 'center' }]}>
-          {ex.reps}
-        </Text>
-
-        <TouchableOpacity onPress={() => removeDraftExercise(idx)} style={{ marginLeft: 10 }}>
-          <Text style={[styles.fitnessTableCellText, { textAlign: 'center' }]}>✕</Text>
-        </TouchableOpacity>
-      </View>
-    ))}
-  </View>
-) : null}
-
-          {/* ✅ Coach requested toggle (no new styles) */}
-          <TouchableOpacity
-            onPress={() => {
-              const next = !coachRequested;
-              setCoachRequested(next);
-              if (!next) setSelectedCoachId('');
-            }}
-            style={{ marginTop: 10 }}
-          >
-            <Text style={styles.playerWelcomeSubText}>
-              {coachRequested ? '☑ ' : '☐ '}
-              Coach requested (submit this to a coach)
-            </Text>
-          </TouchableOpacity>
-
-          {/* ✅ Coach picker only when coach requested */}
-          {coachRequested ? (
-            <View style={{ marginTop: 10 }}>
-              <Text style={styles.statsLabel}>Select coach</Text>
-              <View style={styles.pickerCard}>
-                <Picker
-                  enabled={!loadingCoaches}
-                  selectedValue={selectedCoachId}
-                  onValueChange={(value) => setSelectedCoachId(String(value))}
-                >
-                  <Picker.Item
-                    label={loadingCoaches ? 'Loading coaches…' : 'Select a coach...'}
-                    value=""
-                  />
-                  {coaches.map((c) => (
-                    <Picker.Item key={c.id} label={c.name} value={c.id} />
-                  ))}
-                </Picker>
+                      <TouchableOpacity
+                        style={[styles.primaryButton, { marginTop: 10 }]}
+                        onPress={() => submitAssignedAndAutoComplete(entry)}
+                      >
+                        <Text style={styles.primaryButtonText}>Submit (Auto-complete)</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
               </View>
-            </View>
+            </>
           ) : null}
-<TouchableOpacity
-  style={[styles.secondaryButton, { marginTop: 12 }]}
-  onPress={addDraftExercise}
-  disabled={draftExercises.length >= MAX_EXERCISES_PER_SUBMIT}
->
-  <Text style={styles.secondaryButtonText}>
-    + Add more exercise
-  </Text>
-</TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.primaryButton, { marginTop: 12 }]}
-            onPress={handleAddEntry}
-          >
-            <Text style={styles.primaryButtonText}>
-              {coachRequested ? 'Submit fitness to coach' : 'Save fitness sets'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+          {/* ---------------- Self Performed ---------------- */}
+          {tab === 'self' ? (
+            <>
+              <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Log your training</Text>
 
-
-        {/* Recent sessions */}
-        {orderedDates.length > 0 && (
-          <>
-            <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
-              Recent sessions
-            </Text>
-
-            {orderedDates.map((dateKey) => {
-              const dayEntries = entriesByDate[dateKey];
-              const dateLabel = dayEntries?.[0]?.dateLabel ?? dateKey;
-
-              return (
-                <View key={dateKey} style={styles.playerCard}>
-                  <Text style={styles.playerCardTitle}>{dateLabel}</Text>
-
-                  <View style={styles.fitnessTableHeaderRow}>
-                    <Text style={[styles.fitnessTableHeader, { flex: 2 }]}>Exercise</Text>
-                    <Text style={[styles.fitnessTableHeader, { flex: 1, textAlign: 'center' }]}>
-                      Sets
+              <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
+                {/* Share toggle */}
+                {preferredCoachId ? (
+                  <TouchableOpacity
+                    style={[styles.secondaryButton, { marginBottom: 12 }]}
+                    onPress={() => setShareToCoach(v => !v)}
+                  >
+                    <Text style={styles.secondaryButtonText}>
+                      {shareToCoach ? '✅ Will share to coach' : '⬜ Save for self only'}
                     </Text>
-                    <Text style={[styles.fitnessTableHeader, { flex: 1, textAlign: 'center' }]}>
-                      Reps
+                  </TouchableOpacity>
+                ) : (
+                  <View style={[styles.toplineSectionCard, { marginBottom: 12, padding: 12 }]}>
+                    <Text style={styles.playerWelcomeSubText}>
+                      Coach not linked — saving as self training. (Link a coach in Profile to enable sharing.)
                     </Text>
                   </View>
+                )}
 
-                  {dayEntries.map((entry) => (
-                    <View key={entry.id} style={styles.fitnessTableRow}>
-                      <Text style={[styles.fitnessTableCellText, { flex: 2 }]} numberOfLines={1}>
-                        {entry.description}
-                      </Text>
+                {drills.map((d, idx) => (
+                  <View key={idx} style={{ marginTop: idx === 0 ? 0 : 14 }}>
+                    <Text style={styles.inputLabel}>Drill {idx + 1}</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g., Plank hold"
+                      value={d.drill}
+                      onChangeText={t => updateDrill(idx, { drill: t })}
+                    />
 
-                      <Text style={[styles.fitnessTableCellText, { flex: 1, textAlign: 'center' }]}>
-                        {entry.sets}
-                      </Text>
+                    <Text style={[styles.inputLabel, { marginTop: 10 }]}>Reps</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g., 10"
+                      value={d.reps}
+                      onChangeText={t => updateDrill(idx, { reps: t })}
+                    />
 
-                      <Text style={[styles.fitnessTableCellText, { flex: 1, textAlign: 'center' }]}>
-                        {entry.reps}
-                      </Text>
-                    </View>
+                    <Text style={[styles.inputLabel, { marginTop: 10 }]}>Sets</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g., 3"
+                      value={d.sets}
+                      onChangeText={t => updateDrill(idx, { sets: t })}
+                    />
+
+                    <Text style={[styles.inputLabel, { marginTop: 10 }]}>Notes (optional)</Text>
+                    <TextInput
+                      style={[styles.input, { height: 70, textAlignVertical: 'top' }]}
+                      placeholder="What should you focus on?"
+                      value={d.notes}
+                      onChangeText={t => updateDrill(idx, { notes: t })}
+                      multiline
+                    />
+
+                    {drills.length > 1 ? (
+                      <TouchableOpacity
+                        style={[styles.secondaryButton, { marginTop: 10 }]}
+                        onPress={() => removeDrill(idx)}
+                      >
+                        <Text style={styles.secondaryButtonText}>Remove drill</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  style={[
+                    styles.secondaryButton,
+                    { marginTop: 14, opacity: drills.length >= MAX_DRILLS ? 0.5 : 1 },
+                  ]}
+                  onPress={addMoreDrill}
+                  disabled={drills.length >= MAX_DRILLS}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    + Add more (up to {MAX_DRILLS})
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.primaryButton, { marginTop: 14 }]} onPress={saveSelfPerformed}>
+                  <Text style={styles.primaryButtonText}>
+                    {shareToCoach ? 'Submit to Coach' : 'Save Training'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : null}
+
+          {/* ---------------- History (last 2) ---------------- */}
+          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>History</Text>
+          <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
+            {lastTwoHistory.length === 0 ? (
+              <Text style={styles.emptyBody}>No history yet.</Text>
+            ) : (
+              lastTwoHistory.map(h => (
+                <View key={h.id} style={{ marginTop: 10 }}>
+                  <Text style={styles.inputLabel}>
+                    {h.createdAtLabel || ''}
+                    {'  •  '}
+                    {h.source === 'coach'
+                      ? `Coach Assigned • Completed ${h.completedAtLabel || ''}`
+                      : h.sharedToCoach
+                        ? `Shared to Coach ${h.coachName || ''}`
+                        : 'Self Training'}
+                  </Text>
+
+                  {h.drills.slice(0, MAX_DRILLS).map((d, i) => (
+                    <Text key={i} style={styles.playerWelcomeSubText}>
+                      • {d.drill}
+                      {d.reps ? ` — Reps: ${d.reps}` : ''}
+                      {d.sets ? `, Sets: ${d.sets}` : ''}
+                    </Text>
                   ))}
                 </View>
-              );
-            })}
-          </>
-        )}
+              ))
+            )}
+          </View>
 
-
-        <TouchableOpacity
-          style={[styles.secondaryButton, { marginTop: 20, marginBottom: 30 }]}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.secondaryButtonText}>⬅ Return to Player Dashboard</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <TouchableOpacity
+            style={[styles.secondaryButton, { marginTop: 20, marginBottom: 30 }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.secondaryButtonText}>⬅ Return to Player Dashboard</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
-};
-
-export default PlayerFitnessScreenBody;
+}

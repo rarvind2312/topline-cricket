@@ -483,7 +483,7 @@ const [coachConsentAccepted, setCoachConsentAccepted] = useState(false);
               </View>
             </View>
 
-            <Text style={styles.label}>Highest level of Cricket Played</Text>
+            <Text style={styles.label}>Coaching Level</Text>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setShowPlayerLevelPicker(true)}

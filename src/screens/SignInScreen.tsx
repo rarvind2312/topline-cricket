@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -8,28 +8,30 @@ import {
   Image,
   Alert,
   ScrollView,
-} from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+} from "react-native";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
-import type { RootStackParamList, Role, AppUserProfile } from '../types';
-import { auth } from '../firebase';
-import { getUserProfile } from '../services/userProfile';
+import type { RootStackParamList, Role, AppUserProfile } from "../types";
+import { auth } from "../firebase";
+import { getUserProfile } from "../services/userProfile";
 
-// keep your existing imports the same (logo/styles paths may differ in your project)
-import { styles } from '../styles/styles';
-import { toplineLogo } from '../constants/assets';
+import { styles } from "../styles/styles";
+import { toplineLogo } from "../constants/assets";
 
-type Props = NativeStackScreenProps<RootStackParamList, 'SignIn'>;
+type Props = NativeStackScreenProps<RootStackParamList, "SignIn">;
+
+// Local role type that includes "parent" (even if your Role type doesn’t)
+type ProfileRole = "coach" | "player" | "parent";
 
 const SignInScreen: React.FC<Props> = ({ navigation }) => {
-  const [selectedRole, setSelectedRole] = useState<Role>('player');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<Role>("player");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const canLogin = useMemo(() => {
-    return email.trim() !== '' && password.trim() !== '' && !loading;
+    return email.trim() !== "" && password.trim() !== "" && !loading;
   }, [email, password, loading]);
 
   const handleLogin = async () => {
@@ -38,27 +40,49 @@ const SignInScreen: React.FC<Props> = ({ navigation }) => {
     try {
       setLoading(true);
 
-      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const cred = await signInWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
       const uid = cred.user.uid;
 
       const profile = (await getUserProfile(uid)) as AppUserProfile | null;
 
-      // If you want: enforce role match (optional)
-      if (profile?.role && profile.role !== selectedRole) {
+      // ✅ If profile missing, don’t let app sit in half-logged-in state
+      if (!profile) {
         Alert.alert(
-          'Role mismatch',
-          `This account is registered as ${profile.role === 'player' ? 'Player/Parent' : 'Coach'}. Please switch role and sign in again.`
+          "Login failed",
+          "User profile not found. Please sign up again or contact admin."
         );
+        await auth.signOut();
         return;
       }
 
-    
+      // ✅ Role mismatch check (supports parent)
+      const pr = (profile.role as ProfileRole) || "player";
+
+      const selectedIsCoach = selectedRole === "coach";
+      const accountIsCoach = pr === "coach";
+
+      if (selectedIsCoach !== accountIsCoach) {
+        Alert.alert(
+          "Role mismatch",
+          `This account is registered as ${
+            accountIsCoach ? "Coach" : "Player/Parent"
+          }. Please switch the role and sign in again.`
+        );
+        await auth.signOut();
+        return;
+      }
+
+      // ✅ Nothing else needed: AuthContext + RootNavigator will route correctly
     } catch (e: any) {
       const msg =
-        e?.code === 'auth/invalid-credential'
-          ? 'Invalid email or password.'
-          : e?.message || 'Unable to sign in.';
-      Alert.alert('Sign in failed', msg);
+        e?.code === "auth/invalid-credential"
+          ? "Invalid email or password."
+          : e?.message || "Unable to sign in.";
+      Alert.alert("Sign in failed", msg);
     } finally {
       setLoading(false);
     }
@@ -70,12 +94,10 @@ const SignInScreen: React.FC<Props> = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.formScroll,
-          // ✅ BORDER/SPACING FIX: add left/right padding so inputs don't touch edges
           { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 24 },
         ]}
       >
-        {/* Back */}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-start' }}>
+        <View style={{ flexDirection: "row", justifyContent: "flex-start" }}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={{ paddingVertical: 6, paddingHorizontal: 4 }}
@@ -84,28 +106,29 @@ const SignInScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Logo */}
         <View style={styles.logoWrapperSmall}>
-          <Image source={toplineLogo} style={{ width: 90, height: 90, resizeMode: 'contain' }} />
+          <Image
+            source={toplineLogo}
+            style={{ width: 90, height: 90, resizeMode: "contain" }}
+          />
         </View>
 
         <Text style={styles.sectionTitle}>Login</Text>
 
         <Text style={styles.label}>I am logging in as</Text>
 
-        {/* Role Toggle */}
         <View style={styles.roleToggleRow}>
           <TouchableOpacity
             style={[
               styles.roleTogglePill,
-              selectedRole === 'player' && styles.roleTogglePillActive,
+              selectedRole === "player" && styles.roleTogglePillActive,
             ]}
-            onPress={() => setSelectedRole('player')}
+            onPress={() => setSelectedRole("player")}
           >
             <Text
               style={[
                 styles.roleToggleText,
-                selectedRole === 'player' && styles.roleToggleTextActive,
+                selectedRole === "player" && styles.roleToggleTextActive,
               ]}
             >
               Player / Parent
@@ -115,14 +138,14 @@ const SignInScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             style={[
               styles.roleTogglePill,
-              selectedRole === 'coach' && styles.roleTogglePillActive,
+              selectedRole === "coach" && styles.roleTogglePillActive,
             ]}
-            onPress={() => setSelectedRole('coach')}
+            onPress={() => setSelectedRole("coach")}
           >
             <Text
               style={[
                 styles.roleToggleText,
-                selectedRole === 'coach' && styles.roleToggleTextActive,
+                selectedRole === "coach" && styles.roleToggleTextActive,
               ]}
             >
               Coach
@@ -143,7 +166,7 @@ const SignInScreen: React.FC<Props> = ({ navigation }) => {
 
         <Text style={styles.label}>Password</Text>
         <TextInput
-          style={[styles.input, {marginBottom:20}]}
+          style={[styles.input, { marginBottom: 20 }]}
           placeholder="Password"
           placeholderTextColor="#9ca3af"
           value={password}
@@ -157,15 +180,17 @@ const SignInScreen: React.FC<Props> = ({ navigation }) => {
           onPress={handleLogin}
         >
           <Text style={styles.primaryButtonText}>
-            {loading ? 'Signing in…' : 'Sign In'}
+            {loading ? "Signing in…" : "Sign In"}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.linkButton}
-          onPress={() => navigation.navigate('SignUp')}
+          onPress={() => navigation.navigate("SignUp")}
         >
-          <Text style={styles.linkButtonText}>Don’t have an account? Sign up</Text>
+          <Text style={styles.linkButtonText}>
+            Don’t have an account? Sign up
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

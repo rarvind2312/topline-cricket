@@ -14,9 +14,8 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { collection, getDocs, limit, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, limit, query, where, onSnapshot } from 'firebase/firestore';
 
 import { styles } from '../styles/styles';
 import { db } from '../firebase';
@@ -24,7 +23,13 @@ import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList, PlayerKeyStats } from '../types';
 import { updatePlayerKeyStats } from '../services/userProfile';
 
-// If you already have an assets helper, swap this to your existing import.
+// ✅ shared date utils
+import {
+  safeToDate,
+  formatDayDateTime,
+  formatDayDateFromYYYYMMDD,
+} from '../utils/dateFormatter';
+
 const TOPLINE_LOGO = require('../../assets/topline-cricket-image.jpg');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PlayerDashboard'>;
@@ -33,8 +38,10 @@ type UpcomingSession = {
   id: string;
   skill?: string;
   coachName?: string;
-  startAt?: any; // keep flexible (Firestore Timestamp / string / number)
-  status?: string;
+  date?: string; // YYYY-MM-DD
+  start?: string; // HH:mm
+  end?: string; // HH:mm
+  status?: string; // upcoming/scheduled
 };
 
 type RecentFeedback = {
@@ -45,42 +52,14 @@ type RecentFeedback = {
   createdAtLabel?: string;
 };
 
-function safeToDate(input: any): Date | null {
-  if (!input) return null;
-
-  // ✅ FIX: already a Date
-  if (input instanceof Date) {
-    return Number.isNaN(input.getTime()) ? null : input;
-  }
-
-  // Firestore Timestamp
-  if (typeof input === 'object' && typeof input.toDate === 'function') {
-    try {
-      return input.toDate();
-    } catch {
-      return null;
-    }
-  }
-
-  // number (ms)
-  if (typeof input === 'number') {
-    const d = new Date(input);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-
-  // ISO string
-  if (typeof input === 'string') {
-    const d = new Date(input);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-
-  return null;
-}
-
-function formatDateTime(d: Date): string {
-  const day = d.toLocaleDateString();
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  return `${day} ${time}`;
+// ✅ local-safe: combine YYYY-MM-DD + HH:mm into a Date used ONLY for sorting/selection
+function parseSessionStartLocal(dateStr?: string, startHHMM?: string): Date | null {
+  if (!dateStr || !startHHMM) return null;
+  const [y, mo, da] = dateStr.split('-').map(Number);
+  const [h, mi] = startHHMM.split(':').map(Number);
+  if (!y || !mo || !da || Number.isNaN(h) || Number.isNaN(mi)) return null;
+  const d = new Date(y, mo - 1, da, h, mi, 0, 0);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 export default function PlayerDashboardScreenBody({ navigation }: Props) {
@@ -112,23 +91,8 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
   useEffect(() => {
     if (!uid) return;
 
-    // Keep this helper (used elsewhere in your file)
-    const getSessionsSnap = async (playerField: 'playerId' | 'playerID', lim: number) => {
-      const sessionsRef = collection(db, 'sessions');
-      // ✅ NO orderBy here (avoids composite index requirement)
-      return getDocs(query(sessionsRef, where(playerField, '==', uid), limit(lim)));
-    };
-
-    const getSessionsForUser = async (lim = 200) => {
-      // Some existing docs used `playerID` (capital D). You said you removed it now,
-      // but keeping this fallback is harmless and helps older data.
-      let snap = await getSessionsSnap('playerId', lim);
-      if (snap.empty) snap = await getSessionsSnap('playerID', lim);
-      return snap;
-    };
-
-    // ✅ REALTIME (no orderBy / no startAt where) — safe without composite indexes
-    const loadUpcomingRealtime = () => {
+    // ✅ Upcoming Session — from sessions (date/start/end/status)
+    const loadUpcomingFromSessions = () => {
       setLoadingUpcoming(true);
 
       const sessionsRef = collection(db, 'sessions');
@@ -137,33 +101,31 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
       const unsub = onSnapshot(
         q,
         (snap) => {
-          const allDocs = snap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as any),
-          }));
-
+          const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
           const nowMs = Date.now();
 
-          const next = allDocs
-            .filter((d) => String(d.status ?? '').trim().toLowerCase() === 'scheduled')
-            .filter((d) => {
-              const dt = safeToDate(d.startAt);
-              return !!dt && dt.getTime() >= nowMs;
+          const candidate = docs
+            .filter((s) => {
+              const st = String(s.status || '').trim().toLowerCase();
+              return st === 'upcoming' || st === 'scheduled';
             })
-            .sort((a, b) => {
-              const ad = safeToDate(a.startAt)?.getTime() ?? 0;
-              const bd = safeToDate(b.startAt)?.getTime() ?? 0;
-              return ad - bd;
-            })[0];
+            .map((s) => {
+              const startDt = parseSessionStartLocal(s.date, s.start);
+              return { ...s, _startDt: startDt };
+            })
+            .filter((s) => !!s._startDt && s._startDt.getTime() >= nowMs)
+            .sort((a, b) => a._startDt.getTime() - b._startDt.getTime())[0];
 
           setUpcoming(
-            next
+            candidate
               ? {
-                  id: next.id,
-                  startAt: next.startAt,
-                  coachName: next.coachName,
-                  skill: next.skill,
-                  status: next.status,
+                  id: candidate.id,
+                  coachName: candidate.coachName,
+                  skill: candidate.skill,
+                  date: candidate.date,
+                  start: candidate.start,
+                  end: candidate.end,
+                  status: candidate.status,
                 }
               : null
           );
@@ -171,7 +133,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
           setLoadingUpcoming(false);
         },
         (e) => {
-          console.warn('loadUpcoming realtime failed', e);
+          console.warn('Upcoming sessions listener failed', e);
           setUpcoming(null);
           setLoadingUpcoming(false);
         }
@@ -180,94 +142,157 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
       return unsub;
     };
 
-    // ✅ Recent feedback: also derived from sessions, realtime, no composite indexes
-    const loadRecentFeedbackRealtime = () => {
+    // ✅ Recent Feedback — latest of:
+    // A) reviewed player video feedback (status=reviewed + feedback)
+    // B) coach coaching video notes (uploadedBy=coach + notes)
+    // C) coach-reviewed fitness (fitnessEntries.coachReviewedAtMs)
+    const loadRecentFeedbackCombined = () => {
       setLoadingFeedback(true);
 
-      const sessionsRef = collection(db, 'sessions');
-      const q = query(sessionsRef, where('playerId', '==', uid), limit(300));
+      const videosRef = collection(db, 'videos');
+      const qV = query(videosRef, where('playerId', '==', uid), limit(300));
 
-      const unsub = onSnapshot(
-        q,
+      const fitnessRef = collection(db, 'fitnessEntries');
+      const qF = query(fitnessRef, where('playerId', '==', uid), limit(300));
+
+      let latestVideo: any = null;
+      let latestFitness: any = null;
+
+      const compute = () => {
+        const videoTs = latestVideo?.__ts ?? 0;
+        const fitTs = latestFitness?.__ts ?? 0;
+
+        const pick = videoTs >= fitTs ? latestVideo : latestFitness;
+
+        setRecentFeedback(
+          pick
+            ? {
+                id: pick.id,
+                coachName: pick.coachName,
+                skill: pick.skill || pick.kind || 'Practice',
+                feedback: pick.feedback,
+                createdAtLabel: pick.createdAtLabel,
+              }
+            : null
+        );
+
+        setLoadingFeedback(false);
+      };
+
+      const unsubV = onSnapshot(
+        qV,
         (snap) => {
-          const allDocs = snap.docs.map((d) => ({
-            id: d.id,
-            ...(d.data() as any),
-          }));
+          const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 
-          const withFeedback = allDocs
-            .filter((d) => typeof d.feedback === 'string' && d.feedback.trim().length > 0)
-            .sort((a, b) => {
-              const ad =
-                safeToDate(a.reviewedAt)?.getTime() ??
-                safeToDate(a.updatedAt)?.getTime() ??
-                safeToDate(a.startAt)?.getTime() ??
-                0;
-              const bd =
-                safeToDate(b.reviewedAt)?.getTime() ??
-                safeToDate(b.updatedAt)?.getTime() ??
-                safeToDate(b.startAt)?.getTime() ??
-                0;
-              return bd - ad; // latest first
+          // A) reviewed video feedback
+          const reviewed = docs
+            .filter((v) => {
+              const status = String(v.status || '').trim().toLowerCase();
+              const hasFeedback =
+                typeof v.feedback === 'string' && v.feedback.trim().length > 0;
+              return status === 'reviewed' && hasFeedback;
+            })
+            .map((v) => {
+              const dt = safeToDate(v.reviewedAt) || safeToDate(v.createdAt) || safeToDate(v.createdAtMs);
+              return {
+                id: v.id,
+                coachName: v.coachName,
+                skill: v.skill || 'Practice',
+                feedback: v.feedback,
+                createdAtLabel: dt ? formatDayDateTime(dt) : undefined,
+                __ts: dt?.getTime?.() ?? 0,
+              };
             });
 
-          const latestWithFeedback = withFeedback[0];
+          // B) coach coaching video notes
+          const coachNotes = docs
+            .filter((v) => {
+              const up = String(v.uploadedBy || '').trim().toLowerCase();
+              const hasNotes = typeof v.notes === 'string' && v.notes.trim().length > 0;
+              return up === 'coach' && hasNotes;
+            })
+            .map((v) => {
+              const dt = safeToDate(v.createdAt) || safeToDate(v.createdAtMs);
+              return {
+                id: v.id,
+                coachName: v.coachName,
+                skill: v.skill || 'Coaching Video',
+                feedback: v.notes, // ✅ show as feedback text
+                createdAtLabel: dt ? formatDayDateTime(dt) : undefined,
+                __ts: dt?.getTime?.() ?? 0,
+              };
+            });
 
-          const reviewedAtDate = latestWithFeedback
-            ? safeToDate((latestWithFeedback as any).reviewedAt) ||
-              safeToDate((latestWithFeedback as any).updatedAt) ||
-              safeToDate((latestWithFeedback as any).startAt)
-            : null;
+          const all = [...reviewed, ...coachNotes].sort((a, b) => (b.__ts || 0) - (a.__ts || 0));
+          latestVideo = all[0] || null;
 
-          setRecentFeedback(
-            latestWithFeedback
-              ? {
-                  id: latestWithFeedback.id,
-                  feedback: (latestWithFeedback as any).feedback,
-                  coachName: (latestWithFeedback as any).coachName,
-                  skill: (latestWithFeedback as any).skill,
-                  createdAtLabel: reviewedAtDate ? formatDateTime(reviewedAtDate) : undefined,
-                }
-              : null
-          );
-
-          setLoadingFeedback(false);
+          compute();
         },
         (e) => {
-          console.warn('loadRecentFeedback realtime failed', e);
-          setRecentFeedback(null);
-          setLoadingFeedback(false);
+          console.warn('Recent feedback (videos) listener failed', e);
+          latestVideo = null;
+          compute();
         }
       );
 
-      return unsub;
+      const unsubF = onSnapshot(
+        qF,
+        (snap) => {
+          const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+
+          const reviewedFitness = docs
+            .filter((x) => {
+              // only entries coach reviewed
+              return !!x.coachReviewedAtMs || !!x.coachReviewedAtLabel;
+            })
+            .map((x) => {
+              const dt =
+                safeToDate(x.coachReviewedAtMs) ||
+                safeToDate(x.coachReviewedAtLabel) ||
+                safeToDate(x.completedAtMs) ||
+                safeToDate(x.createdAtMs);
+
+              // If later you store a coach note, show it here:
+              const coachNote =
+                typeof x.coachReviewNotes === 'string' && x.coachReviewNotes.trim().length > 0
+                  ? x.coachReviewNotes
+                  : 'Fitness reviewed by coach.';
+
+              return {
+                id: x.id,
+                coachName: x.coachName || 'Coach',
+                kind: 'Fitness Review',
+                feedback: coachNote,
+                createdAtLabel: dt ? formatDayDateTime(dt) : undefined,
+                __ts: dt?.getTime?.() ?? 0,
+              };
+            })
+            .sort((a, b) => (b.__ts || 0) - (a.__ts || 0));
+
+          latestFitness = reviewedFitness[0] || null;
+          compute();
+        },
+        (e) => {
+          console.warn('Recent feedback (fitness) listener failed', e);
+          latestFitness = null;
+          compute();
+        }
+      );
+
+      return () => {
+        try { unsubV(); } catch {}
+        try { unsubF(); } catch {}
+      };
     };
 
-    const unsubUpcoming = loadUpcomingRealtime();
-    const unsubFeedback = loadRecentFeedbackRealtime();
+    const unsubUpcoming = loadUpcomingFromSessions();
+    const unsubFeedback = loadRecentFeedbackCombined();
 
-    // cleanup listeners
     return () => {
-      try {
-        unsubUpcoming?.();
-      } catch {}
-      try {
-        unsubFeedback?.();
-      } catch {}
+      try { unsubUpcoming?.(); } catch {}
+      try { unsubFeedback?.(); } catch {}
     };
   }, [uid]);
-
-  const formatDateTime = (value: any) => {
-    const d = safeToDate(value);
-    if (!d) return '—';
-    return d.toLocaleString('en-AU', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
 
   // -----------------------------
   // Stats (manual entry; saved to Firestore)
@@ -347,11 +372,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
     }
   };
 
-  const upcomingTimeLabel = useMemo(() => {
-    const d = upcoming ? safeToDate(upcoming.startAt) : null;
-    return d ? formatDateTime(d) : '';
-  }, [upcoming]);
-
+  // shimmer
   const shimmerAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -372,7 +393,33 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
     outputRange: [-140, 260],
   });
 
-  
+  // Pending requests (unchanged)
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  useEffect(() => {
+    if (!uid) return;
+
+    const qReq = query(collection(db, 'sessionRequests'), where('playerId', '==', uid), limit(50));
+
+    const unsub = onSnapshot(
+      qReq,
+      (snap) => {
+        const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+        rows.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+
+        const visible = rows.filter((r) =>
+          ['requested', 'countered'].includes(String(r.status || '').toLowerCase())
+        );
+
+        setPendingRequests(visible);
+      },
+      (err) => {
+        console.log('sessionRequests(player) listener error:', err);
+        Alert.alert('Listener error', err.message);
+      }
+    );
+
+    return () => unsub();
+  }, [uid]);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -402,144 +449,139 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
         </View>
 
         {/* Upcoming Session */}
-   
-<>
-  <View style={styles.sectionHeaderRow}>
-    <Text style={styles.sectionTitle}>Upcoming Session</Text>
-  </View>
-
-  {/* ✅ No outer white card */}
-  <View style={styles.sectionBlock}>
-    {loadingUpcoming ? (
-      <View style={styles.toplineSectionCard}>
-        <View style={styles.shimmerBox}>
-          <Animated.View
-            style={[
-              styles.shimmerOverlay,
-              { transform: [{ translateX: shimmerTranslateX }] },
-            ]}
-          >
-            <LinearGradient
-              colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{ flex: 1 }}
-            />
-          </Animated.View>
-        </View>
-        <View style={{ height: 12 }} />
-        <View style={[styles.shimmerBox, { height: 18, width: '55%' }]} />
-      </View>
-    ) : upcoming ? (
-      <View style={styles.toplineSectionCard}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <Text style={styles.bigTitle}>{upcoming.skill || 'Session'}</Text>
-
-          <View style={[styles.pill, { alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={styles.pillText}>
-              {(String(upcoming.status || 'Scheduled')).toUpperCase()}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={styles.pillText}>
-              👤 {String(upcoming.coachName || '—')}
-            </Text>
-          </View>
-
-          <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={styles.pillText}>
-              🗓 {formatDateTime(upcoming.startAt) || '—'}
-            </Text>
-          </View>
-        </View>
-      </View>
-    ) : (
-      <View style={styles.toplineSectionCard}>
-        <Text style={styles.emptyBody}>
-          No Upcoming Sessions yet.
-        </Text>
-      </View>
-    )}
-  </View>
-</>
-
-
-        {/* Recent Reviews */}
         <>
-  <View style={styles.sectionHeaderRow}>
-    <Text style={styles.sectionTitle}>Recent Feedback</Text>
-  </View>
-
-  {/* ✅ Remove the outer white card look */}
-  <View style={styles.sectionBlock}>
-    {loadingFeedback ? (
-      <View style={styles.toplineSectionCard}>
-        <View style={styles.shimmerBox}>
-          <Animated.View
-            style={[
-              styles.shimmerOverlay,
-              { transform: [{ translateX: shimmerTranslateX }] },
-            ]}
-          >
-            <LinearGradient
-              colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{ flex: 1 }}
-            />
-          </Animated.View>
-        </View>
-        <View style={{ height: 12 }} />
-        <View style={[styles.shimmerBox, { height: 18, width: '70%' }]} />
-      </View>
-    ) : recentFeedback ? (
-      <View style={styles.toplineSectionCard}>
-        {/* ✅ Date + Skill (bold + visible) */}
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={styles.pillText}>
-              🗓 {String(recentFeedback.createdAtLabel || '—')}
-            </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Upcoming Session</Text>
           </View>
 
-          {/* ✅ Center align Batting */}
-          <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={styles.pillText}>
-              🏏 {String(recentFeedback.skill || 'Coach notes')}
-            </Text>
+          <View style={styles.sectionBlock}>
+            {loadingUpcoming ? (
+              <View style={styles.toplineSectionCard}>
+                <View style={styles.shimmerBox}>
+                  <Animated.View
+                    style={[styles.shimmerOverlay, { transform: [{ translateX: shimmerTranslateX }] }]}
+                  >
+                    <LinearGradient
+                      colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={{ flex: 1 }}
+                    />
+                  </Animated.View>
+                </View>
+                <View style={{ height: 12 }} />
+                <View style={[styles.shimmerBox, { height: 18, width: '55%' }]} />
+              </View>
+            ) : upcoming ? (
+              <View style={styles.toplineSectionCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={styles.bigTitle}>{upcoming.skill || 'Session'}</Text>
+                  <View style={[styles.pill, { alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={styles.pillText}>
+                      {String(upcoming.status || 'UPCOMING').toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.divider} />
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={styles.pillText}>👤 {String(upcoming.coachName || '—')}</Text>
+                  </View>
+
+                  <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={styles.pillText}>
+                      🗓{' '}
+                      {upcoming.date
+                        ? `${formatDayDateFromYYYYMMDD(upcoming.date)} ${upcoming.start ?? ''}`.trim()
+                        : '—'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.toplineSectionCard}>
+                <Text style={styles.emptyBody}>No Upcoming Sessions yet.</Text>
+              </View>
+            )}
           </View>
+        </>
+
+        {/* Pending Requests */}
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Pending Requests</Text>
+        <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
+          {pendingRequests.length === 0 ? (
+            <Text style={styles.emptyBody}>No pending requests.</Text>
+          ) : (
+            pendingRequests.slice(0, 2).map((r) => (
+              <View key={r.id} style={{ marginTop: 10 }}>
+                <Text style={styles.inputLabel}>
+                  {r.coachName || 'Coach'} • {r.date ? formatDayDateFromYYYYMMDD(String(r.date)) : '—'} •{' '}
+                  {r.slotStart}-{r.slotEnd}
+                </Text>
+                <Text style={styles.playerWelcomeSubText}>
+                  Status: {String(r.status).toUpperCase()}
+                </Text>
+              </View>
+            ))
+          )}
         </View>
 
-        <View style={styles.divider} />
+        {/* Recent Feedback */}
+        <>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Recent Feedback</Text>
+          </View>
 
-        <View style={styles.titleRow}>
-          <Text style={styles.bigTitle}>{recentFeedback.coachName || 'Coach'}</Text>
-        </View>
+          <View style={styles.sectionBlock}>
+            {loadingFeedback ? (
+              <View style={styles.toplineSectionCard}>
+                <View style={styles.shimmerBox}>
+                  <Animated.View
+                    style={[styles.shimmerOverlay, { transform: [{ translateX: shimmerTranslateX }] }]}
+                  >
+                    <LinearGradient
+                      colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={{ flex: 1 }}
+                    />
+                  </Animated.View>
+                </View>
+                <View style={{ height: 12 }} />
+                <View style={[styles.shimmerBox, { height: 18, width: '70%' }]} />
+              </View>
+            ) : recentFeedback ? (
+              <View style={styles.toplineSectionCard}>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={styles.pillText}>🗓 {String(recentFeedback.createdAtLabel || '—')}</Text>
+                  </View>
 
-        <Text style={styles.feedbackText}>{recentFeedback.feedback || '—'}</Text>
-      </View>
-    ) : (
-      <View style={styles.toplineSectionCard}>
-        <Text style={styles.emptyTitle}>No feedback yet</Text>
-        <Text style={styles.emptyBody}>
-          Your coach’s notes will appear here once a session is reviewed.
-        </Text>
-      </View>
-    )}
-  </View>
-</>
+                  <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={styles.pillText}>🏏 {String(recentFeedback.skill || 'Practice')}</Text>
+                  </View>
+                </View>
 
+                <View style={styles.divider} />
+
+                <View style={styles.titleRow}>
+                  <Text style={styles.bigTitle}>{recentFeedback.coachName || 'Coach'}</Text>
+                </View>
+
+                <Text style={styles.feedbackText}>{recentFeedback.feedback || '—'}</Text>
+              </View>
+            ) : (
+              <View style={styles.toplineSectionCard}>
+                <Text style={styles.emptyTitle}>No feedback yet</Text>
+                <Text style={styles.emptyBody}>
+                  Your coach’s notes will appear here once a video is reviewed or a coaching video is shared.
+                </Text>
+              </View>
+            )}
+          </View>
+        </>
 
         {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -550,7 +592,16 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
             onPress={() => navigation.navigate('PlayerVideos')}
           >
             <Text style={styles.quickActionEmoji}>🎥</Text>
-            <Text style={styles.quickActionText}>Upload Video</Text>
+            <Text style={styles.quickActionText}>My Practice Videos</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionTile}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('PlayerCoachingVideos')}
+          >
+            <Text style={styles.quickActionEmoji}>📺</Text>
+            <Text style={styles.quickActionText}>Coaching Videos</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -561,9 +612,18 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
             <Text style={styles.quickActionEmoji}>❤️‍🔥</Text>
             <Text style={styles.quickActionText}>Fitness</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionTile}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('PlayerBookSessions')}
+          >
+            <Text style={styles.quickActionEmoji}>📅</Text>
+            <Text style={styles.quickActionText}>Session Booking</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Stats */}
+        {/* Stats (unchanged) */}
         <Text style={styles.sectionTitle}>Stats</Text>
         <View style={styles.card}>
           <View style={styles.statsHeaderRow}>
@@ -610,17 +670,13 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
           ) : null}
 
           {!keyStats && (
-            <TouchableOpacity
-              style={styles.statsButton}
-              activeOpacity={0.9}
-              onPress={openStatsEditor}
-            >
+            <TouchableOpacity style={styles.statsButton} activeOpacity={0.9} onPress={openStatsEditor}>
               <Text style={styles.statsButtonText}>Add key stats manually</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Stats Modal */}
+        {/* Stats Modal (unchanged) */}
         <Modal visible={statsModalVisible} transparent animationType="fade">
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>

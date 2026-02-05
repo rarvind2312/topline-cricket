@@ -1,4 +1,4 @@
-export type Role = 'player' | 'coach';
+export type Role = 'player' | 'coach' |  "parent";
 
 export type PlayerKeyStats = {
   matches: number;
@@ -84,8 +84,13 @@ export type RootStackParamList = {
   PlayerDashboard: undefined;
   CoachDashboard: undefined;
   PlayerVideos: undefined;
+  PlayerCoachingVideos: undefined;
   PlayerFitness: undefined;
+  PlayerBookSessions: undefined;
   CoachVideoReview: undefined;
+  CoachFitness: undefined;
+  CoachAvailability: undefined;
+  CoachBookingRequests: undefined;
 };
 
 export type AppUserProfile = User & {
