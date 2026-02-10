@@ -6,13 +6,13 @@ import {
   Text,
   View,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList } from '../types';
 import { styles } from '../styles/styles';
-import HeroHeader from '../components/HeroHeader';
 import { initialsFromName, toTitleCaseName } from '../utils/text';
 import { toplineLogo } from '../constants/assets';
 import { formatDayDate } from '../utils/dateFormatter';
@@ -38,9 +38,9 @@ type Session = {
   coachId?: string;
   coachName?: string;
 
-  date?: string;   // YYYY-MM-DD (local)
-  start?: string;  // "09:00"
-  end?: string;    // "10:00"
+  date?: string; // YYYY-MM-DD (local)
+  start?: string; // "09:00"
+  end?: string; // "10:00"
   status?: string; // "upcoming"
 
   createdAtMs?: number;
@@ -54,11 +54,22 @@ type ReviewItem = {
   createdAtMs: number;
 };
 
+type BookingRequest = {
+  id: string;
+  playerId?: string;
+  playerName?: string;
+  coachId?: string;
+  date?: string; // YYYY-MM-DD
+  slotStart?: string;
+  slotEnd?: string;
+  createdAtMs?: number;
+};
+
 function toLocalDateKey(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`; // local YYYY-MM-DD
+  return `${y}-${m}-${day}`;
 }
 
 function startOfTodayLocalMs() {
@@ -67,7 +78,6 @@ function startOfTodayLocalMs() {
   return start.getTime();
 }
 
-// ✅ helper: convert "YYYY-MM-DD" -> Date (local)
 function parseYYYYMMDDLocal(s?: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
   if (!m) return null;
@@ -96,13 +106,20 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
   // Lists
   const [todaySessionsList, setTodaySessionsList] = useState<Session[]>([]);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [latestRequest, setLatestRequest] = useState<BookingRequest | null>(null);
 
-  // ✅ local date key (fixes “yesterday” problem)
+  // ✅ local date key
   const todayKey = useMemo(() => toLocalDateKey(new Date()), []);
   const todayStartMs = useMemo(() => startOfTodayLocalMs(), []);
+  const todayLabel = useMemo(
+    () => formatDayDate(parseYYYYMMDDLocal(todayKey) || new Date()),
+    [todayKey]
+  );
 
-  // ✅ label: "Tue, 03-Feb-2026"
-  const todayLabel = useMemo(() => formatDayDate(parseYYYYMMDDLocal(todayKey) || new Date()), [todayKey]);
+  const formatRequestDate = (dateKey?: string) => {
+    const dt = parseYYYYMMDDLocal(dateKey);
+    return dt ? formatDayDate(dt) : String(dateKey || '—');
+  };
 
   useEffect(() => {
     const uid = firebaseUser?.uid;
@@ -120,7 +137,7 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
     const unsubSessions = onSnapshot(
       sessionsQ,
       (snap) => {
-        const rows = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as Session[];
+        const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as Session[];
         rows.sort((a, b) => String(a.start || '').localeCompare(String(b.start || '')));
         setSessionsToday(rows.length);
         setTodaySessionsList(rows);
@@ -133,19 +150,17 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
     );
 
     // -------------------------
-    // 2) Review items:
-    //    Videos pending + Fitness logs today
+    // 2) Review items: videos pending + fitness today
     // -------------------------
     let pendingVideos: ReviewItem[] = [];
     let pendingFitness: ReviewItem[] = [];
 
     const recompute = () => {
-      // Merge + dedupe by (playerId + kind)
       const seen = new Set<string>();
       const merged = [...pendingVideos, ...pendingFitness]
-        .filter(x => !!x.playerId)
+        .filter((x) => !!x.playerId)
         .sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0))
-        .filter(x => {
+        .filter((x) => {
           const key = `${x.playerId}_${x.kind}`;
           if (seen.has(key)) return false;
           seen.add(key);
@@ -155,9 +170,8 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
       setReviewItems(merged);
       setPendingReviews(merged.length);
 
-      // Unique players count from review activity
       const playersSet = new Set<string>();
-      merged.forEach(x => playersSet.add(x.playerId));
+      merged.forEach((x) => playersSet.add(x.playerId));
       setTotalPlayers(playersSet.size);
     };
 
@@ -171,15 +185,17 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
     const unsubVideos = onSnapshot(
       videosQ,
       (snap) => {
-        pendingVideos = snap.docs.map(d => {
-          const data: any = d.data();
-          return {
-            kind: 'video' as const,
-            playerId: String(data.playerId || ''),
-            playerName: String(data.playerName || 'Player'),
-            createdAtMs: Number(data.createdAtMs || 0),
-          };
-        }).filter(x => !!x.playerId);
+        pendingVideos = snap.docs
+          .map((d) => {
+            const data: any = d.data();
+            return {
+              kind: 'video' as const,
+              playerId: String(data.playerId || ''),
+              playerName: String(data.playerName || 'Player'),
+              createdAtMs: Number(data.createdAtMs || 0),
+            };
+          })
+          .filter((x) => !!x.playerId);
         recompute();
       },
       (err) => {
@@ -202,15 +218,17 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
     const unsubFitness = onSnapshot(
       fitnessQ,
       (snap) => {
-        pendingFitness = snap.docs.map(d => {
-          const data: any = d.data();
-          return {
-            kind: 'fitness' as const,
-            playerId: String(data.playerId || ''),
-            playerName: String(data.playerName || 'Player'),
-            createdAtMs: Number(data.createdAtMs || 0),
-          };
-        }).filter(x => !!x.playerId);
+        pendingFitness = snap.docs
+          .map((d) => {
+            const data: any = d.data();
+            return {
+              kind: 'fitness' as const,
+              playerId: String(data.playerId || ''),
+              playerName: String(data.playerName || 'Player'),
+              createdAtMs: Number(data.createdAtMs || 0),
+            };
+          })
+          .filter((x) => !!x.playerId);
         recompute();
       },
       (err) => {
@@ -227,102 +245,249 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
     };
   }, [firebaseUser?.uid, todayKey, todayStartMs]);
 
-  return (
-    <SafeAreaView style={styles.screenContainer}>
-      <ScrollView contentContainerStyle={styles.formScroll}>
-        <HeroHeader initials={coachInitials} name={displayName} logoSource={toplineLogo} />
+  useEffect(() => {
+    const uid = firebaseUser?.uid;
+    if (!uid) return;
 
-        {/* Upcoming sessions (Today) */}
-        <Text style={styles.sectionTitle}>Upcoming sessions ({todayLabel})</Text>
-        <View style={styles.playerCard}>
+    const reqQ = query(
+      collection(db, 'sessionRequests'),
+      where('coachId', '==', uid),
+      where('status', '==', 'requested'),
+      orderBy('createdAtMs', 'desc'),
+      limit(1)
+    );
+
+    const unsub = onSnapshot(
+      reqQ,
+      (snap) => {
+        if (snap.empty) {
+          setLatestRequest(null);
+          return;
+        }
+        const d = snap.docs[0];
+        setLatestRequest({ id: d.id, ...(d.data() as any) });
+      },
+      (err) => {
+        console.log('CoachDashboard booking request listener error:', err);
+        setLatestRequest(null);
+      }
+    );
+
+    return () => unsub();
+  }, [firebaseUser?.uid]);
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Premium header (match Player dashboard) */}
+        <View style={styles.headerCard}>
+          <View style={styles.headerRow}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{coachInitials}</Text>
+            </View>
+
+            <View style={styles.headerTextBlock}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {displayName}
+              </Text>
+              <Text style={styles.headerRole} numberOfLines={1}>
+                Coach
+              </Text>
+            </View>
+
+            <Image source={toplineLogo} style={styles.headerLogo} />
+          </View>
+        </View>
+
+        {/* Upcoming Sessions (today) */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.coachSectionTitle}>Upcoming sessions</Text>
+        </View>
+
+        <View style={styles.sectionBlock}>
           {todaySessionsList.length === 0 ? (
-            <Text style={styles.playerCardEmptyText}>No sessions scheduled for today yet.</Text>
+            <View style={styles.toplineSectionCard}>
+              <Text style={styles.emptyBody}>No sessions scheduled for today yet.</Text>
+            </View>
           ) : (
-            <>
-              <Text style={styles.playerCardTitle}>Today’s sessions</Text>
-              {todaySessionsList.slice(0, 4).map(s => (
-                <View key={s.id} style={{ marginTop: 8 }}>
-                  <Text style={styles.playerCardSubtitle}>⏰ {s.start} – {s.end}</Text>
-                  <Text style={styles.playerCardBodyText}>🏏 {s.playerName || 'Player'}</Text>
+            <View style={styles.toplineSectionCard}>
+              <View style={styles.titleRow}>
+                <Text style={styles.coachBigTitle}>Today’s sessions</Text>
+                <View style={styles.pill}>
+                  <Text style={styles.pillText}>{String(sessionsToday)} TOTAL</Text>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              {todaySessionsList.slice(0, 4).map((s) => (
+                <View key={s.id} style={{ marginTop: 10 }}>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={styles.pillText}>⏰ {s.start} – {s.end}</Text>
+                    </View>
+
+                    <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={styles.pillText} numberOfLines={1}>
+                        🏏 {s.playerName || 'Player'}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               ))}
+
               {todaySessionsList.length > 4 ? (
-                <Text style={[styles.playerCardBodyText, { marginTop: 8 }]}>
+                <Text style={[styles.playerWelcomeSubText, { marginTop: 10 }]}>
                   + {todaySessionsList.length - 4} more
                 </Text>
               ) : null}
-            </>
+            </View>
           )}
         </View>
 
-        {/* Players needing review */}
-        <Text style={styles.sectionTitle}>Reviews Requested</Text>
-        <View style={styles.playerCard}>
-          {reviewItems.length === 0 ? (
-            <Text style={styles.playerCardEmptyText}>
-              When players upload new videos or log fitness sessions, they will appear here.
-            </Text>
+        {/* Booking Requests (latest only) */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.coachSectionTitle}>Booking Requests</Text>
+        </View>
+
+        <View style={styles.sectionBlock}>
+          {latestRequest ? (
+            <View style={styles.toplineSectionCard}>
+              <View style={styles.titleRow}>
+                <Text style={styles.coachBigTitle}>Latest request</Text>
+                <View style={styles.pill}>
+                  <Text style={styles.pillText}>PENDING</Text>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              <Text style={styles.inputLabel}>
+                {latestRequest.playerName || 'Player'}
+              </Text>
+              <Text style={styles.playerWelcomeSubText}>
+                {formatRequestDate(latestRequest.date)} • {latestRequest.slotStart} – {latestRequest.slotEnd}
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.secondaryButton, { marginTop: 10 }]}
+                onPress={() => navigation.navigate('CoachBookingRequests')}
+              >
+                <Text style={styles.secondaryButtonText}>View booking requests</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
-            <>
-              <Text style={styles.playerCardTitle}>Pending reviews</Text>
+            <View style={styles.toplineSectionCard}>
+              <Text style={styles.emptyBody}>No booking requests right now.</Text>
+              <TouchableOpacity
+                style={[styles.secondaryButton, { marginTop: 10 }]}
+                onPress={() => navigation.navigate('CoachBookingRequests')}
+              >
+                <Text style={styles.secondaryButtonText}>Open booking requests</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Reviews Requested */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.coachSectionTitle}>Reviews Requested</Text>
+        </View>
+
+        <View style={styles.sectionBlock}>
+          {reviewItems.length === 0 ? (
+            <View style={styles.toplineSectionCard}>
+              <Text style={styles.emptyTitle}>No pending reviews</Text>
+              <Text style={styles.emptyBody}>
+                When players upload new videos or log fitness sessions, they will appear here.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.toplineSectionCard}>
+              <View style={styles.titleRow}>
+                <Text style={styles.coachBigTitle}>Pending reviews</Text>
+                <View style={styles.pill}>
+                  <Text style={styles.pillText}>{String(pendingReviews)} PENDING</Text>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
 
               {reviewItems.slice(0, 6).map((r, idx) => (
-                <Text key={`${r.playerId}_${r.kind}_${idx}`} style={styles.playerCardBodyText}>
-                  • {r.playerName} - {r.kind === 'video' ? 'Video' : 'Fitness'}
+                <Text
+                  key={`${r.playerId}_${r.kind}_${idx}`}
+                  style={styles.playerWelcomeSubText}
+                >
+                  • {r.playerName} — {r.kind === 'video' ? 'Video' : 'Fitness'}
                 </Text>
               ))}
 
               {reviewItems.length > 6 ? (
-                <Text style={[styles.playerCardSubtitle, { marginTop: 6 }]}>
+                <Text style={[styles.playerWelcomeSubText, { marginTop: 8 }]}>
                   + {reviewItems.length - 6} more
                 </Text>
               ) : null}
-            </>
+            </View>
           )}
         </View>
 
-        {/* Quick Actions */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.playerQuickActionsCard}>
-          <View style={styles.playerQuickActionsRow}>
-            <TouchableOpacity
-              style={styles.playerQuickActionTile}
-              onPress={() => navigation.navigate('CoachVideoReview')}
-            >
-              <Text style={styles.playerQuickActionEmoji}>🎥</Text>
-              <Text style={styles.playerQuickActionText}>Review Videos</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.playerQuickActionTile}
-              onPress={() => navigation.navigate('CoachFitness')}
-            >
-              <Text style={styles.playerQuickActionEmoji}>🏋️</Text>
-              <Text style={styles.playerQuickActionText}>Review Fitness</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.playerQuickActionTile}
-              onPress={() => navigation.navigate('CoachAvailability')}
-            >
-              <Text style={styles.playerQuickActionEmoji}>📅</Text>
-              <Text style={styles.playerQuickActionText}>Availabilty</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.playerQuickActionTile}
-              onPress={() => navigation.navigate('CoachBookingRequests')}
-            >
-              <Text style={styles.playerQuickActionEmoji}>📥</Text>
-              <Text style={styles.playerQuickActionText}>Booking Requests</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ marginTop: 10 }}>
-            <Text style={styles.playerWelcomeSubText}>
-              Players: {totalPlayers} • Pending reviews: {pendingReviews}
+        {/* Quick Actions (match player tile style) */}
+        <Text style={styles.coachSectionTitle}>Quick Actions</Text>
+        <View style={styles.quickActionsCard}>
+          <TouchableOpacity
+            style={styles.quickActionTile}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('CoachVideoReview')}
+          >
+            <View style={styles.quickActionIconWrap}>
+              <Text style={styles.quickActionEmoji}>🎥</Text>
+            </View>
+            <Text style={styles.quickActionText} numberOfLines={2}>
+              Review Videos
             </Text>
-          </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionTile}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('CoachFitness')}
+          >
+            <View style={styles.quickActionIconWrap}>
+              <Text style={styles.quickActionEmoji}>🏋️</Text>
+            </View>
+            <Text style={styles.quickActionText} numberOfLines={2}>
+              Review Fitness
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionTile}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('CoachAvailability')}
+          >
+            <View style={styles.quickActionIconWrap}>
+              <Text style={styles.quickActionEmoji}>📅</Text>
+            </View>
+            <Text style={styles.quickActionText} numberOfLines={2}>
+              Availability
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionTile}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('CoachBookingRequests')}
+          >
+            <View style={styles.quickActionIconWrap}>
+              <Text style={styles.quickActionEmoji}>📥</Text>
+            </View>
+            <Text style={styles.quickActionText} numberOfLines={2}>
+              Booking Requests
+            </Text>
+          </TouchableOpacity>
+
+          {/* Premium footer line */}
+          
         </View>
       </ScrollView>
     </SafeAreaView>

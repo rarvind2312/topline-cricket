@@ -80,6 +80,7 @@ type VideoDoc = {
 };
 
 type PlayerLite = { id: string; name: string };
+type Tab = 'review' | 'share';
 
 const CoachVideoReviewScreenBody: React.FC<any> = ({ navigation }: any) => {
   const { firebaseUser, profile } = useAuth();
@@ -96,6 +97,8 @@ const CoachVideoReviewScreenBody: React.FC<any> = ({ navigation }: any) => {
   // 1) FOR REVIEW: player -> coach
   const [forReview, setForReview] = useState<VideoDoc[]>([]);
   const [loadingReview, setLoadingReview] = useState(false);
+
+  const [tab, setTab] = useState<Tab>('review');
 
   const [selected, setSelected] = useState<VideoDoc | null>(null);
   const [draftFeedback, setDraftFeedback] = useState('');
@@ -350,143 +353,203 @@ useEffect(() => {
     }
   };
 
+  const SegToggle = ({
+    leftLabel,
+    rightLabel,
+    leftActive,
+    onLeft,
+    onRight,
+  }: {
+    leftLabel: string;
+    rightLabel: string;
+    leftActive: boolean;
+    onLeft: () => void;
+    onRight: () => void;
+  }) => {
+    return (
+      <View style={styles.coachFitnessSegWrap}>
+        <TouchableOpacity
+          onPress={onLeft}
+          style={[styles.coachFitnessSegBtn, leftActive ? styles.coachFitnessSegBtnActive : null]}
+        >
+          <Text style={[styles.coachFitnessSegText, leftActive ? styles.coachFitnessSegTextActive : null]}>
+            {leftLabel}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={onRight}
+          style={[styles.coachFitnessSegBtn, !leftActive ? styles.coachFitnessSegBtnActive : null]}
+        >
+          <Text style={[styles.coachFitnessSegText, !leftActive ? styles.coachFitnessSegTextActive : null]}>
+            {rightLabel}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.screenContainer}>
       <ScrollView contentContainerStyle={styles.formScroll}>
-        <View style={styles.coachTopHeaderRow}>
-          <Text style={styles.sectionTitle}>Coach Videos</Text>
-          <Image source={toplineLogo} style={styles.coachTopRightLogoSmall} resizeMode="contain" />
-        </View>
+       <View style={styles.coachPremiumHeaderCard}>
+  <View style={styles.coachPremiumHeaderRow}>
+    <View style={{ flex: 1, paddingRight: 10 }}>
+      <Text style={styles.coachPremiumHeaderTitle}>Review Videos</Text>
+      <Text style={styles.coachPremiumHeaderSub}>
+        Review player uploads and share coaching clips.
+      </Text>
+    </View>
 
-        {/* 1) FOR REVIEW */}
-        <Text style={styles.playerCardSubtitle}>For Review</Text>
-        <Text style={styles.playerWelcomeSubText}>
-          Videos submitted by players will appear here. Tap a card to review and save feedback.
-        </Text>
+    <Image source={toplineLogo} style={styles.coachPremiumHeaderLogo} />
+  </View>
+</View>
 
-        {loadingReview ? (
-          <Text style={styles.playerWelcomeSubText}>Loading…</Text>
-        ) : forReview.length === 0 ? (
-          <Text style={styles.playerCardEmptyText}>No videos to review yet.</Text>
-        ) : (
-          forReview.map((v) => {
-            const isDone = !!v.reviewed || v.status === 'reviewed';
-            return (
-              <TouchableOpacity
-                key={v.id}
-                style={styles.coachVideoCard}
-                onPress={() => openReview(v)}
-              >
-                <View style={styles.videoCardRow}>
-                  <View>
-                    <Text style={styles.videoCardName}>{v.playerName || 'Player'}</Text>
-                    <Text style={styles.videoCardMeta}>
-                      {v.createdAtLabel || '—'} • {isDone ? 'Reviewed' : 'Pending'}
-                    </Text>
-                  </View>
+        <SegToggle
+          leftLabel="For Review"
+          rightLabel="Upload for Player"
+          leftActive={tab === 'review'}
+          onLeft={() => setTab('review')}
+          onRight={() => setTab('share')}
+        />
 
-                  <View
-                    style={[
-                      styles.coachStatusPill,
-                      isDone ? styles.coachStatusPillDone : styles.coachStatusPillPending,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.coachStatusText,
-                        isDone ? styles.coachStatusTextDone : styles.coachStatusTextPending,
-                      ]}
-                    >
-                      {isDone ? 'Reviewed' : 'Pending'}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.coachVideoCTA}>Tap to {isDone ? 'view' : 'review'} →</Text>
-              </TouchableOpacity>
-            );
-          })
-        )}
-
-        {/* 2) SHARE TO PLAYER */}
-        <View style={{ marginTop: 18 }}>
-          <Text style={styles.cardSubtitle}>Share Video to Player</Text>
-          <Text style={styles.playerWelcomeSubText}>
-            Upload a short coaching clip (max 2 mins) and share it with a registered player.
-          </Text>
-
-          <Text style={styles.assignLabel}>Select player</Text>
-          <View style={styles.pickerCard}>
-            <Picker
-              enabled={!loadingPlayers && !uploading}
-              selectedValue={selectedPlayerId}
-              onValueChange={(value) => setSelectedPlayerId(String(value))}
-            >
-              <Picker.Item label={loadingPlayers ? 'Loading players…' : 'Select a player...'} value="" />
-              {players.map((p) => (
-                <Picker.Item key={p.id} label={p.name} value={p.id} />
-              ))}
-            </Picker>
-          </View>
-
-          <Text style={[styles.assignLabel, { marginTop: 10 }]}>Notes (optional)</Text>
-          <TextInput
-            style={[styles.statsInput, { height: 90, textAlignVertical: 'top' }]}
-            multiline
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="What should the player focus on?"
-            editable={!uploading}
-          />
-
-          {/* ✅ NEW: consent checkbox */}
-          <TouchableOpacity
-            onPress={() => setCoachAcceptedPolicy((p) => !p)}
-            style={{ marginTop: 10 }}
-            disabled={uploading}
-          >
+        {tab === 'review' ? (
+          <>
+            {/* 1) FOR REVIEW */}
+            <Text style={styles.playerCardSubtitle}>For Review</Text>
             <Text style={styles.playerWelcomeSubText}>
-              {coachAcceptedPolicy ? '☑ ' : '☐ '}
-              I confirm this is an appropriate coaching video for the player. I take responsibility for the
-              content. Inappropriate uploads may lead to my account being removed.
+              Videos submitted by players will appear here. Tap a card to review and save feedback.
             </Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.secondaryButton, { marginTop: 12 }]}
-            onPress={pickCoachVideo}
-            disabled={uploading}
-          >
-            <Text style={styles.secondaryButtonText}>
-              {pickedVideoUri ? 'Change Video' : '+ Pick Video (max 2 mins)'}
-            </Text>
-          </TouchableOpacity>
+            {loadingReview ? (
+              <Text style={styles.playerWelcomeSubText}>Loading…</Text>
+            ) : forReview.length === 0 ? (
+              <Text style={styles.playerCardEmptyText}>No videos to review yet.</Text>
+            ) : (
+              forReview.map((v) => {
+                const isDone = !!v.reviewed || v.status === 'reviewed';
+                return (
+                  <TouchableOpacity
+                    key={v.id}
+                    style={styles.coachVideoCard}
+                    onPress={() => openReview(v)}
+                  >
+                    <View style={styles.videoCardRow}>
+                      <View>
+                        <Text style={styles.videoCardName}>{v.playerName || 'Player'}</Text>
+                        <Text style={styles.videoCardMeta}>
+                          {v.createdAtLabel || '—'} • {isDone ? 'Reviewed' : 'Pending'}
+                        </Text>
+                      </View>
 
-          {!!pickedVideoUri && (
-            <View style={{ marginTop: 12 }}>
-              <Video
-                source={{ uri: pickedVideoUri }}
-                style={styles.videoPlayer}
-                useNativeControls
-                resizeMode={ResizeMode.CONTAIN}
+                      <View
+                        style={[
+                          styles.coachStatusPill,
+                          isDone ? styles.coachStatusPillDone : styles.coachStatusPillPending,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.coachStatusText,
+                            isDone ? styles.coachStatusTextDone : styles.coachStatusTextPending,
+                          ]}
+                        >
+                          {isDone ? 'Reviewed' : 'Pending'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.coachVideoCTA}>Tap to {isDone ? 'view' : 'review'} →</Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </>
+        ) : null}
+
+        {tab === 'share' ? (
+          <>
+            {/* 2) SHARE TO PLAYER */}
+            <View style={{ marginTop: 18 }}>
+              <Text style={styles.cardSubtitle}>Share Video to Player</Text>
+              <Text style={styles.playerWelcomeSubText}>
+                Upload a short coaching clip (max 2 mins) and share it with a registered player.
+              </Text>
+
+              <Text style={styles.coachAssignLabel}>Select player</Text>
+              <View style={styles.pickerCard}>
+                <Picker
+                  enabled={!loadingPlayers && !uploading}
+                  selectedValue={selectedPlayerId}
+                  onValueChange={(value) => setSelectedPlayerId(String(value))}
+                >
+                  <Picker.Item label={loadingPlayers ? 'Loading players…' : 'Select a player...'} value="" />
+                  {players.map((p) => (
+                    <Picker.Item key={p.id} label={p.name} value={p.id} />
+                  ))}
+                </Picker>
+              </View>
+
+              <Text style={[styles.coachAssignLabel, { marginTop: 10 }]}>Notes (optional)</Text>
+              <TextInput
+                style={[styles.statsInput, { height: 90, textAlignVertical: 'top' }]}
+                multiline
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="What should the player focus on?"
+                editable={!uploading}
               />
-            </View>
-          )}
 
-          <TouchableOpacity
-            style={[
-              styles.confirmButton,
-              !selectedPlayerId || !pickedVideoUri || !coachAcceptedPolicy ? { opacity: 0.5 } : null,
-              { marginTop: 12 },
-            ]}
-            disabled={!selectedPlayerId || !pickedVideoUri || !coachAcceptedPolicy || uploading}
-            onPress={shareToPlayer}
-          >
-            <Text style={styles.confirmButtonText}>
-              {uploading ? 'Uploading…' : 'Send to Player'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+              {/* ✅ NEW: consent checkbox */}
+              <TouchableOpacity
+                onPress={() => setCoachAcceptedPolicy((p) => !p)}
+                style={{ marginTop: 10 }}
+                disabled={uploading}
+              >
+                <Text style={styles.playerWelcomeSubText}>
+                  {coachAcceptedPolicy ? '☑ ' : '☐ '}
+                  I confirm this is an appropriate coaching video for the player. I take responsibility for the
+                  content. Inappropriate uploads may lead to my account being removed.
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.secondaryButton, { marginTop: 12 }]}
+                onPress={pickCoachVideo}
+                disabled={uploading}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  {pickedVideoUri ? 'Change Video' : '+ Pick Video (max 2 mins)'}
+                </Text>
+              </TouchableOpacity>
+
+              {!!pickedVideoUri && (
+                <View style={{ marginTop: 12 }}>
+                  <Video
+                    source={{ uri: pickedVideoUri }}
+                    style={styles.videoPlayer}
+                    useNativeControls
+                    resizeMode={ResizeMode.CONTAIN}
+                  />
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton,
+                  !selectedPlayerId || !pickedVideoUri || !coachAcceptedPolicy ? { opacity: 0.5 } : null,
+                  { marginTop: 12 },
+                ]}
+                disabled={!selectedPlayerId || !pickedVideoUri || !coachAcceptedPolicy || uploading}
+                onPress={shareToPlayer}
+              >
+                <Text style={styles.confirmButtonText}>
+                  {uploading ? 'Uploading…' : 'Send to Player'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : null}
 
         {/* Return */}
         <View style={{ marginTop: 18, marginBottom: 30 }}>
@@ -504,7 +567,7 @@ useEffect(() => {
           <SafeAreaView style={styles.screenContainer}>
             <ScrollView contentContainerStyle={styles.formScroll}>
               <View style={styles.coachReviewHeaderRow}>
-                <Text style={styles.sectionTitle}>Review</Text>
+                <Text style={styles.coachSectionTitle}>Review</Text>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Image source={toplineLogo} style={styles.coachTopRightLogoSmall} resizeMode="contain" />

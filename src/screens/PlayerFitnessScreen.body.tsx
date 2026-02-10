@@ -1,13 +1,4 @@
 // PlayerFitnessScreenBody.tsx
-// ✅ FIXES ADDED:
-// 1) Coach-assigned drills AUTO-MOVE to Completed when player submits (single update to the same fitnessEntries doc).
-// 2) History now includes BOTH:
-//    - player-created entries (source='player')
-//    - coach-assigned entries that the player completed (source='coach' + status='completed')
-// 3) Button text updated to "Submit (Auto-complete)" to reflect the behaviour.
-// ✅ DATE FORMAT FIX:
-// - Uses shared utils from ../utils/dateFormat for consistent labels.
-
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   SafeAreaView,
@@ -37,7 +28,6 @@ import {
   where,
 } from 'firebase/firestore';
 
-// ✅ shared date utils
 import { safeToDate, formatDayDateTime } from '../utils/dateFormatter';
 
 type Drill = { drill: string; reps: string; sets: string; notes: string };
@@ -62,7 +52,6 @@ type FitnessEntry = {
   completedAtMs?: number | null;
   completedAtLabel?: string | null;
 
-  // optional metadata
   completedByPlayerId?: string | null;
   completedByPlayerName?: string | null;
 };
@@ -82,22 +71,14 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
     return full || (user as any)?.email || 'Player';
   }, [user]);
 
-  // Optional: preferred coach in player profile
   const preferredCoachId = (user as any)?.coachId || '';
   const preferredCoachName =
-    (user as any)?.coachName ||
-    (user as any)?.assignedCoachName ||
-    'Coach';
+    (user as any)?.coachName || (user as any)?.assignedCoachName || 'Coach';
 
   const [tab, setTab] = useState<Tab>('coach');
-
-  // Coach assigned ACTIVE entries (player sees these)
   const [coachAssigned, setCoachAssigned] = useState<FitnessEntry[]>([]);
-
-  // History entries (player-created + completed coach-assigned)
   const [historyEntries, setHistoryEntries] = useState<FitnessEntry[]>([]);
 
-  // Self performed form
   const [shareToCoach, setShareToCoach] = useState(true);
   const [drills, setDrills] = useState<Drill[]>([emptyDrill()]);
 
@@ -114,13 +95,9 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
   };
 
   useEffect(() => {
-    // If no coach linked, force self-only
-    if (!preferredCoachId) {
-      setShareToCoach(false);
-    }
+    if (!preferredCoachId) setShareToCoach(false);
   }, [preferredCoachId]);
 
-  // ✅ ONE listener: all entries for player, then filter client-side
   useEffect(() => {
     if (!uid) return;
 
@@ -137,7 +114,6 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
         const rows: FitnessEntry[] = snap.docs.map(d => {
           const data: any = d.data();
 
-          // ✅ Consistent labels using shared safeToDate + formatDayDateTime
           const createdDt =
             safeToDate(data?.createdAt) ||
             safeToDate(data?.createdAtMs) ||
@@ -148,8 +124,13 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
             safeToDate(data?.completedAtMs) ||
             (data?.completedAtLabel ? safeToDate(String(data.completedAtLabel)) : null);
 
-          const createdAtLabel = createdDt ? formatDayDateTime(createdDt) : (data?.createdAtLabel ? String(data.createdAtLabel) : '');
-          const completedAtLabel = completedDt ? formatDayDateTime(completedDt) : (data?.completedAtLabel ? String(data.completedAtLabel) : '');
+          const createdAtLabel = createdDt
+            ? formatDayDateTime(createdDt)
+            : (data?.createdAtLabel ? String(data.createdAtLabel) : '');
+
+          const completedAtLabel = completedDt
+            ? formatDayDateTime(completedDt)
+            : (data?.completedAtLabel ? String(data.completedAtLabel) : '');
 
           return {
             id: d.id,
@@ -170,17 +151,11 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
           };
         });
 
-        // ✅ Coach Assigned tab: only coach->assigned (ACTIVE)
-        const assigned = rows.filter(r => r.source === 'coach' && r.status === 'assigned');
-        setCoachAssigned(assigned);
+        setCoachAssigned(rows.filter(r => r.source === 'coach' && r.status === 'assigned'));
 
-        // ✅ History:
-        // - all player created entries (source=player)
-        // - AND coach assigned entries that the player completed (source=coach + completed)
-        const history = rows.filter(
-          r => r.source === 'player' || (r.source === 'coach' && r.status === 'completed')
+        setHistoryEntries(
+          rows.filter(r => r.source === 'player' || (r.source === 'coach' && r.status === 'completed'))
         );
-        setHistoryEntries(history);
       },
       err => console.log('PlayerFitness listener error:', err)
     );
@@ -208,10 +183,7 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
       return false;
     }
 
-    if (shareToCoach && !preferredCoachId) {
-      // Auto-fallback instead of blocking
-      setShareToCoach(false);
-    }
+    if (shareToCoach && !preferredCoachId) setShareToCoach(false);
 
     return true;
   };
@@ -229,7 +201,7 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
       .filter(d => d.drill.length > 0);
 
     const now = new Date();
-    const createdAtLabel = formatDayDateTime(now); // ✅ consistent
+    const createdAtLabel = formatDayDateTime(now);
     const createdAtMs = Date.now();
 
     try {
@@ -256,13 +228,7 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
         completedAtLabel: willShare ? null : createdAtLabel,
       });
 
-      Alert.alert(
-        'Saved',
-        willShare
-          ? `Submitted to coach (${preferredCoachName}).`
-          : 'Saved for self training.'
-      );
-
+      Alert.alert('Saved', willShare ? `Submitted to coach (${preferredCoachName}).` : 'Saved for self training.');
       setDrills([emptyDrill()]);
     } catch (e: any) {
       console.log('Save self performed error:', e);
@@ -270,7 +236,6 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
     }
   };
 
-  // ✅ FIX: Player "submit" of coach-assigned drill = auto-move to completed
   const submitAssignedAndAutoComplete = async (entry: FitnessEntry) => {
     if (!uid || !entry?.id) return;
 
@@ -285,17 +250,14 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
             style: 'default',
             onPress: async () => {
               const now = new Date();
-
               await updateDoc(doc(db, 'fitnessEntries', entry.id), {
                 status: 'completed',
                 completedAt: serverTimestamp(),
                 completedAtMs: Date.now(),
-                completedAtLabel: formatDayDateTime(now), // ✅ consistent
+                completedAtLabel: formatDayDateTime(now),
                 completedByPlayerId: uid,
                 completedByPlayerName: playerName,
               });
-
-              // No manual state changes needed—listener will move it from coachAssigned -> history
               Alert.alert('Done', 'Moved to Completed.');
             },
           },
@@ -307,119 +269,95 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
     }
   };
 
-  // ✅ Red segmented toggle (like signup)
-  const SegToggle = ({
-    leftLabel,
-    rightLabel,
-    leftActive,
-    onLeft,
-    onRight,
-  }: {
-    leftLabel: string;
-    rightLabel: string;
-    leftActive: boolean;
-    onLeft: () => void;
-    onRight: () => void;
-  }) => {
-    return (
-      <View
-        style={{
-          flexDirection: 'row',
-          backgroundColor: '#c62828',
-          borderRadius: 12,
-          padding: 4,
-          marginTop: 14,
-        }}
-      >
-        <TouchableOpacity
-          onPress={onLeft}
-          style={{
-            flex: 1,
-            paddingVertical: 12,
-            borderRadius: 10,
-            backgroundColor: leftActive ? '#ffffff' : 'transparent',
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ fontWeight: '700', color: leftActive ? '#c62828' : '#ffffff' }}>
-            {leftLabel}
-          </Text>
-        </TouchableOpacity>
+ const [historyExpanded, setHistoryExpanded] = useState(false);
 
-        <TouchableOpacity
-          onPress={onRight}
-          style={{
-            flex: 1,
-            paddingVertical: 12,
-            borderRadius: 10,
-            backgroundColor: leftActive ? 'transparent' : '#ffffff',
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ fontWeight: '700', color: leftActive ? '#ffffff' : '#c62828' }}>
-            {rightLabel}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const lastTwoHistory = historyEntries.slice(0, 2);
+const visibleHistory: FitnessEntry[] = historyExpanded
+  ? historyEntries
+  : historyEntries.slice(0, 2);
 
   return (
     <SafeAreaView style={styles.screenContainer}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={styles.flex1} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.formScroll} keyboardShouldPersistTaps="handled">
-          <Text style={styles.playerWelcomeSubText}>
-            Track fitness drills assigned by coach, or log your own training.
-          </Text>
+          {/* Premium header */}
+          <View style={styles.fitnessTopCard}>
+            <Text style={styles.fitnessTopTitle}>Fitness</Text>
+            <Text style={styles.fitnessTopSubtitle}>
+              Track coach drills or log your training. Keep it consistent and build progress.
+            </Text>
 
-          <SegToggle
-            leftLabel="Coach Assigned"
-            rightLabel="Self Performed"
-            leftActive={tab === 'coach'}
-            onLeft={() => setTab('coach')}
-            onRight={() => setTab('self')}
-          />
+            {/* Seg toggle */}
+            <View style={styles.fitnessToggleWrap}>
+              <TouchableOpacity
+                onPress={() => setTab('coach')}
+                style={[styles.fitnessToggleBtn, tab === 'coach' && styles.fitnessToggleBtnActive]}
+                activeOpacity={0.9}
+              >
+                <Text style={[styles.fitnessToggleText, tab === 'coach' && styles.fitnessToggleTextActive]}>
+                  Coach Assigned
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setTab('self')}
+                style={[styles.fitnessToggleBtn, tab === 'self' && styles.fitnessToggleBtnActive]}
+                activeOpacity={0.9}
+              >
+                <Text style={[styles.fitnessToggleText, tab === 'self' && styles.fitnessToggleTextActive]}>
+                  Self Performed
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {/* ---------------- Coach Assigned ---------------- */}
           {tab === 'coach' ? (
             <>
-              <Text style={[styles.sectionTitle, { marginTop: 18 }]}>
-                Coach Suggested Fitness Drills
-              </Text>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Coach Suggested Drills</Text>
+              </View>
 
-              <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
-                {coachAssigned.length === 0 ? (
-                  <Text style={styles.emptyBody}>No drills assigned by coach yet.</Text>
-                ) : (
-                  coachAssigned.map(entry => (
-                    <View key={entry.id} style={{ marginTop: 12 }}>
-                      <Text style={styles.inputLabel}>
-                        {(entry.coachName || 'Coach')}{' '}
-                        {entry.createdAtLabel ? `• Assigned ${entry.createdAtLabel}` : ''}
-                      </Text>
+              <View style={styles.sectionBlock}>
+                <View style={styles.toplineSectionCard}>
+                  {coachAssigned.length === 0 ? (
+                    <Text style={styles.emptyBody}>No drills assigned by coach yet.</Text>
+                  ) : (
+                    coachAssigned.map(entry => (
+                      <View key={entry.id} style={styles.fitnessAssignedCard}>
+                        <View style={styles.fitnessAssignedHeaderRow}>
+                          <View style={styles.fitnessBadge}>
+                            <Text style={styles.fitnessBadgeText}>COACH</Text>
+                          </View>
+                          <Text style={styles.fitnessAssignedMeta} numberOfLines={1}>
+                            {(entry.coachName || 'Coach')}
+                            {entry.createdAtLabel ? ` • Assigned ${entry.createdAtLabel}` : ''}
+                          </Text>
+                        </View>
 
-                      {entry.drills.slice(0, MAX_DRILLS).map((d, i) => (
-                        <Text key={i} style={styles.playerWelcomeSubText}>
-                          • {d.drill}
-                          {d.reps ? ` — Reps: ${d.reps}` : ''}
-                          {d.sets ? `, Sets: ${d.sets}` : ''}
-                        </Text>
-                      ))}
+                        <View style={styles.fitnessDivider} />
 
-                      <TouchableOpacity
-                        style={[styles.primaryButton, { marginTop: 10 }]}
-                        onPress={() => submitAssignedAndAutoComplete(entry)}
-                      >
-                        <Text style={styles.primaryButtonText}>Submit (Auto-complete)</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))
-                )}
+                        {entry.drills.slice(0, MAX_DRILLS).map((d, i) => (
+                          <View key={i} style={styles.fitnessBulletRow}>
+                            <Text style={styles.fitnessBulletDot}>•</Text>
+                            <Text style={styles.fitnessBulletText}>
+                              {d.drill}
+                              {d.reps ? ` — Reps: ${d.reps}` : ''}
+                              {d.sets ? `, Sets: ${d.sets}` : ''}
+                            </Text>
+                          </View>
+                        ))}
+
+                        <TouchableOpacity
+                          style={[styles.primaryButton, { marginTop: 12 }]}
+                          onPress={() => submitAssignedAndAutoComplete(entry)}
+                          activeOpacity={0.9}
+                        >
+                          <Text style={styles.primaryButtonText}>Submit (Auto-complete)</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  )}
+                </View>
               </View>
             </>
           ) : null}
@@ -427,128 +365,184 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
           {/* ---------------- Self Performed ---------------- */}
           {tab === 'self' ? (
             <>
-              <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Log your training</Text>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Log your training</Text>
+              </View>
 
-              <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
-                {/* Share toggle */}
-                {preferredCoachId ? (
+              <View style={styles.sectionBlock}>
+                <View style={styles.toplineSectionCard}>
+                  {/* Share toggle */}
+                  {preferredCoachId ? (
+                    <TouchableOpacity
+                      style={styles.fitnessShareRow}
+                      onPress={() => setShareToCoach(v => !v)}
+                      activeOpacity={0.9}
+                    >
+                      <View style={[styles.fitnessShareDot, shareToCoach ? styles.fitnessShareDotOn : null]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.fitnessShareTitle}>
+                          {shareToCoach ? 'Share with coach' : 'Save for self only'}
+                        </Text>
+                        <Text style={styles.fitnessShareSub}>
+                          {shareToCoach ? `Coach: ${preferredCoachName}` : 'This will not be sent to coach.'}
+                        </Text>
+                      </View>
+                      <Text style={styles.fitnessShareAction}>{shareToCoach ? 'ON' : 'OFF'}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.fitnessInfoBox}>
+                  
+                    </View>
+                  )}
+
+                  {drills.map((d, idx) => (
+                    <View key={idx} style={[styles.fitnessFormCard, idx === 0 ? { marginTop: 0 } : null]}>
+                      <View style={styles.fitnessFormHeaderRow}>
+                        <Text style={styles.fitnessFormTitle}>Drill {idx + 1}</Text>
+                        {drills.length > 1 ? (
+                          <TouchableOpacity onPress={() => removeDrill(idx)} activeOpacity={0.85}>
+                            <Text style={styles.fitnessRemoveText}>Remove</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+
+                      <Text style={styles.inputLabel}>Drill name</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="e.g., Plank hold"
+                        value={d.drill}
+                        onChangeText={t => updateDrill(idx, { drill: t })}
+                      />
+
+                      <View style={styles.fitnessTwoColRow}>
+                        <View style={styles.fitnessCol}>
+                          <Text style={styles.inputLabel}>Reps</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="e.g., 10"
+                            value={d.reps}
+                            onChangeText={t => updateDrill(idx, { reps: t })}
+                            keyboardType="number-pad"
+                          />
+                        </View>
+
+                        <View style={styles.fitnessCol}>
+                          <Text style={styles.inputLabel}>Sets</Text>
+                          <TextInput
+                            style={styles.input}
+                            placeholder="e.g., 3"
+                            value={d.sets}
+                            onChangeText={t => updateDrill(idx, { sets: t })}
+                            keyboardType="number-pad"
+                          />
+                        </View>
+                      </View>
+
+                      <Text style={styles.inputLabel}>Notes (optional)</Text>
+                      <TextInput
+                        style={styles.fitnessNotesInput}
+                        placeholder="What should you focus on?"
+                        value={d.notes}
+                        onChangeText={t => updateDrill(idx, { notes: t })}
+                        multiline
+                      />
+                    </View>
+                  ))}
+
                   <TouchableOpacity
-                    style={[styles.secondaryButton, { marginBottom: 12 }]}
-                    onPress={() => setShareToCoach(v => !v)}
+                    style={[
+                      styles.secondaryButton,
+                      { marginTop: 14, opacity: drills.length >= MAX_DRILLS ? 0.5 : 1 },
+                    ]}
+                    onPress={addMoreDrill}
+                    disabled={drills.length >= MAX_DRILLS}
+                    activeOpacity={0.9}
                   >
-                    <Text style={styles.secondaryButtonText}>
-                      {shareToCoach ? '✅ Will share to coach' : '⬜ Save for self only'}
+                    <Text style={styles.secondaryButtonText}>+ Add more (up to {MAX_DRILLS})</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { marginTop: 14 }]}
+                    onPress={saveSelfPerformed}
+                    activeOpacity={0.9}
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      {shareToCoach ? 'Submit to Coach' : 'Save Training'}
                     </Text>
                   </TouchableOpacity>
-                ) : (
-                  <View style={[styles.toplineSectionCard, { marginBottom: 12, padding: 12 }]}>
-                    <Text style={styles.playerWelcomeSubText}>
-                      Coach not linked — saving as self training. (Link a coach in Profile to enable sharing.)
-                    </Text>
-                  </View>
-                )}
-
-                {drills.map((d, idx) => (
-                  <View key={idx} style={{ marginTop: idx === 0 ? 0 : 14 }}>
-                    <Text style={styles.inputLabel}>Drill {idx + 1}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="e.g., Plank hold"
-                      value={d.drill}
-                      onChangeText={t => updateDrill(idx, { drill: t })}
-                    />
-
-                    <Text style={[styles.inputLabel, { marginTop: 10 }]}>Reps</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="e.g., 10"
-                      value={d.reps}
-                      onChangeText={t => updateDrill(idx, { reps: t })}
-                    />
-
-                    <Text style={[styles.inputLabel, { marginTop: 10 }]}>Sets</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="e.g., 3"
-                      value={d.sets}
-                      onChangeText={t => updateDrill(idx, { sets: t })}
-                    />
-
-                    <Text style={[styles.inputLabel, { marginTop: 10 }]}>Notes (optional)</Text>
-                    <TextInput
-                      style={[styles.input, { height: 70, textAlignVertical: 'top' }]}
-                      placeholder="What should you focus on?"
-                      value={d.notes}
-                      onChangeText={t => updateDrill(idx, { notes: t })}
-                      multiline
-                    />
-
-                    {drills.length > 1 ? (
-                      <TouchableOpacity
-                        style={[styles.secondaryButton, { marginTop: 10 }]}
-                        onPress={() => removeDrill(idx)}
-                      >
-                        <Text style={styles.secondaryButtonText}>Remove drill</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                ))}
-
-                <TouchableOpacity
-                  style={[
-                    styles.secondaryButton,
-                    { marginTop: 14, opacity: drills.length >= MAX_DRILLS ? 0.5 : 1 },
-                  ]}
-                  onPress={addMoreDrill}
-                  disabled={drills.length >= MAX_DRILLS}
-                >
-                  <Text style={styles.secondaryButtonText}>
-                    + Add more (up to {MAX_DRILLS})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.primaryButton, { marginTop: 14 }]} onPress={saveSelfPerformed}>
-                  <Text style={styles.primaryButtonText}>
-                    {shareToCoach ? 'Submit to Coach' : 'Save Training'}
-                  </Text>
-                </TouchableOpacity>
+                </View>
               </View>
             </>
           ) : null}
 
           {/* ---------------- History (last 2) ---------------- */}
-          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>History</Text>
-          <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
-            {lastTwoHistory.length === 0 ? (
-              <Text style={styles.emptyBody}>No history yet.</Text>
-            ) : (
-              lastTwoHistory.map(h => (
-                <View key={h.id} style={{ marginTop: 10 }}>
-                  <Text style={styles.inputLabel}>
-                    {h.createdAtLabel || ''}
-                    {'  •  '}
-                    {h.source === 'coach'
-                      ? `Coach Assigned • Completed ${h.completedAtLabel || ''}`
-                      : h.sharedToCoach
-                        ? `Shared to Coach ${h.coachName || ''}`
-                        : 'Self Training'}
-                  </Text>
+          <View style={styles.sectionHeaderRow}>
+  <Text style={styles.sectionTitle}>History</Text>
 
-                  {h.drills.slice(0, MAX_DRILLS).map((d, i) => (
-                    <Text key={i} style={styles.playerWelcomeSubText}>
-                      • {d.drill}
-                      {d.reps ? ` — Reps: ${d.reps}` : ''}
-                      {d.sets ? `, Sets: ${d.sets}` : ''}
-                    </Text>
-                  ))}
-                </View>
-              ))
-            )}
-          </View>
+  {historyEntries.length > 2 ? (
+    <TouchableOpacity
+      onPress={() => setHistoryExpanded((v: boolean) => !v)}
+      activeOpacity={0.85}
+      style={styles.historyToggleBtn}
+    >
+      <Text style={styles.historyToggleText}>
+        {historyExpanded ? 'Show less' : 'Show all'}
+      </Text>
+    </TouchableOpacity>
+  ) : null}
+</View>
+          {visibleHistory.length === 0 ? (
+  <Text style={styles.emptyBody}>No history yet.</Text>
+) : (
+  visibleHistory.map((h: FitnessEntry) => (
+    <View key={h.id} style={styles.fitnessHistoryItem}>
+      <View style={styles.fitnessHistoryTopRow}>
+        <Text style={styles.fitnessHistoryDate} numberOfLines={1}>
+          {h.createdAtLabel || ''}
+        </Text>
+
+        <View
+          style={[
+            styles.fitnessHistoryPill,
+            h.source === 'coach'
+              ? styles.fitnessHistoryPillCoach
+              : styles.fitnessHistoryPillSelf,
+          ]}
+        >
+          <Text style={styles.fitnessHistoryPillText}>
+            {h.source === 'coach' ? 'COACH' : (h.sharedToCoach ? 'SHARED' : 'SELF')}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={styles.fitnessHistoryMeta}>
+        {h.source === 'coach'
+          ? `Coach Assigned • Completed ${h.completedAtLabel || ''}`
+          : h.sharedToCoach
+            ? `Shared to ${h.coachName || 'Coach'}`
+            : 'Self Training'}
+      </Text>
+
+      <View style={styles.fitnessDivider} />
+
+      {h.drills.slice(0, MAX_DRILLS).map((d: Drill, i: number) => (
+        <View key={i} style={styles.fitnessBulletRow}>
+          <Text style={styles.fitnessBulletDot}>•</Text>
+          <Text style={styles.fitnessBulletText}>
+            {d.drill}
+            {d.reps ? ` — Reps: ${d.reps}` : ''}
+            {d.sets ? `, Sets: ${d.sets}` : ''}
+          </Text>
+        </View>
+      ))}
+    </View>
+  ))
+)}
 
           <TouchableOpacity
             style={[styles.secondaryButton, { marginTop: 20, marginBottom: 30 }]}
             onPress={() => navigation.goBack()}
+            activeOpacity={0.9}
           >
             <Text style={styles.secondaryButtonText}>⬅ Return to Player Dashboard</Text>
           </TouchableOpacity>

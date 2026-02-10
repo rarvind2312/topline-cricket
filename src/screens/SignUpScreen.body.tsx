@@ -28,11 +28,13 @@ type SignUpProps = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 const PLAYER_LEVELS: string[] = [
   'School / Beginner',
   'Club',
-  'Association / District',
   'Representative',
+  'SSV',
+  'Craig Shield',
+  'Dowling Shield',
+  'Premiers',
   'State',
-  'National',
-  'International',
+
 ];
 
 const COACH_LEVELS: string[] = [
@@ -82,7 +84,7 @@ const Checkbox = ({
         ) : null}
       </View>
 
-      <Text style={{ fontSize: 14 }}>{label}</Text>
+      <Text style={{ fontSize: 15 }}>{label}</Text>
     </TouchableOpacity>
   );
 };
@@ -306,11 +308,6 @@ const [coachConsentAccepted, setCoachConsentAccepted] = useState(false);
         };
 
         await upsertUserProfile(cred.user.uid,profile);
-
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'PlayerDashboard' }],
-        });
         return;
       }
 
@@ -329,11 +326,6 @@ const [coachConsentAccepted, setCoachConsentAccepted] = useState(false);
       };
 
       await upsertUserProfile(cred.user.uid,coachProfile);
-
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'CoachDashboard' }],
-      });
     } catch (e: any) {
       const msg =
         e?.code === 'auth/email-already-in-use'
@@ -349,7 +341,7 @@ const [coachConsentAccepted, setCoachConsentAccepted] = useState(false);
     <SafeAreaView style={styles.screenContainer}>
       <ScrollView contentContainerStyle={styles.formScroll}>
         <View style={styles.logoWrapperSmall}>
-          <Image source={toplineLogo} style={{ width: 90, height: 90, resizeMode: 'contain' }} />
+          <Image source={toplineLogo} style={{ width: 110, height: 110, resizeMode: 'contain' }} />
         </View>
 
         {/* Role toggle */}
@@ -383,8 +375,7 @@ const [coachConsentAccepted, setCoachConsentAccepted] = useState(false);
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionTitle}>Sign Up</Text>
-
+      
         {/* Common fields */}
         <Text style={styles.label}>First Name</Text>
         <TextInput
@@ -483,7 +474,7 @@ const [coachConsentAccepted, setCoachConsentAccepted] = useState(false);
               </View>
             </View>
 
-            <Text style={styles.label}>Coaching Level</Text>
+            <Text style={styles.label}>Highest Level of Cricket Played</Text>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setShowPlayerLevelPicker(true)}
@@ -558,7 +549,7 @@ const [coachConsentAccepted, setCoachConsentAccepted] = useState(false);
               />
             </View>
 
-            <Text style={styles.label}>Highest level of Cricket Played</Text>
+            <Text style={styles.label}>Coach Level</Text>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setShowCoachLevelPicker(true)}

@@ -121,7 +121,7 @@ useEffect(() => {
       where('playerId', '==', uid),
       where('uploadedBy', '==', 'player'), // ✅ strict player-only
       orderBy('createdAt', 'desc'),
-      limit(30)
+      limit(5)
     );
 
     const unsub = onSnapshot(
@@ -332,7 +332,9 @@ useEffect(() => {
       <ScrollView contentContainerStyle={styles.formScroll}>
         <Text style={styles.sectionTitle}>My Practice Videos</Text>
 
-        <Image source={TOPLINE_LOGO} style={[styles.headerLogo, { alignSelf: 'flex-end' }]} />
+       <View style={styles.topRightLogoContainer}>
+    <Image source={TOPLINE_LOGO} style={styles.topRightLogo} />
+  </View>
 
         <Text style={styles.playerWelcomeSubText}>
           Upload 1 short practice clip (max 2 minutes) and share it with your coach for review.
@@ -437,7 +439,7 @@ useEffect(() => {
             </Text>
           ) : (
             <View style={{ marginTop: 10 }}>
-              {recentShared.map((v) => (
+              {recentShared.slice(0,3).map((v) => (
                 <View key={v.id} style={styles.videoItemCard}>
                   <Text style={styles.videoItemTitle}>
                     {v.createdAtLabel || '—'}  •  {v.skill}

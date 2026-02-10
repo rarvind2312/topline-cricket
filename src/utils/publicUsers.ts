@@ -37,6 +37,12 @@ export async function fetchCoaches(limitN = 50): Promise<PublicUserLite[]> {
     const role: PublicUserRole = "coach";
     return { id: d.id, name: toName(data, role), role };
   });
+  try {
+  const snap = await getDocs(q);
+  console.log("fetchCoaches size:", snap.size);
+} catch (e) {
+  console.log("fetchCoaches error:", e);
+}
 
   list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   return list;

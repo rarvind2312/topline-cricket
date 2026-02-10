@@ -8,6 +8,7 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import {
   collection,
@@ -17,7 +18,8 @@ import {
   orderBy,
   updateDoc,
   doc,
-  addDoc,
+  serverTimestamp,
+  setDoc,
   getDoc,
 } from 'firebase/firestore';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -27,6 +29,7 @@ import { useAuth } from '../context/AuthContext';
 import { styles } from '../styles/styles';
 import type { RootStackParamList } from '../types';
 import { formatDayDate } from '../utils/dateFormatter';
+import { toplineLogo } from '../constants/assets';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CoachBookingRequests'>;
 
@@ -41,15 +44,11 @@ type SessionRequest = {
   slotStart: string;   // "10:00"
   slotEnd: string;     // "11:00"
 
-  status: 'requested' | 'accepted' | 'declined' | 'countered';
+  status: 'requested' | 'accepted' | 'declined' | 'countered' | 'cancelled';
 
   createdAtMs?: number;
-  createdAtLabel?: string;
   updatedAtMs?: number;
-  updatedAtLabel?: string;
 };
-
-type Slot = { start: string; end: string; isBooked: boolean };
 
 export default function CoachBookingRequestsScreenBody({ navigation }: Props) {
   const { firebaseUser, profile } = useAuth();
@@ -64,7 +63,6 @@ export default function CoachBookingRequestsScreenBody({ navigation }: Props) {
 
   const [requests, setRequests] = useState<SessionRequest[]>([]);
 
-  // ✅ helper: convert "YYYY-MM-DD" -> Date (local)
   const parseYYYYMMDD = (s: string): Date | null => {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
     if (!m) return null;
@@ -75,7 +73,6 @@ export default function CoachBookingRequestsScreenBody({ navigation }: Props) {
     return Number.isNaN(dt.getTime()) ? null : dt;
   };
 
-  // ✅ consistent label: "Tue, 03-Feb-2026" (fallback to raw string)
   const formatRequestDate = (dateKey: string) => {
     const dt = parseYYYYMMDD(dateKey);
     return dt ? formatDayDate(dt) : String(dateKey || '—');
@@ -103,8 +100,9 @@ export default function CoachBookingRequestsScreenBody({ navigation }: Props) {
     return () => unsub();
   }, [coachId]);
 
+  type Slot = { start: string; end: string; isBooked: boolean };
+
   const markAvailabilitySlotBooked = async (req: SessionRequest) => {
-    // Availability doc: coachId_date
     const availDocId = `${req.coachId}_${req.date}`;
     const ref = doc(db, 'coachAvailability', availDocId);
     const snap = await getDoc(ref);
@@ -129,28 +127,33 @@ export default function CoachBookingRequestsScreenBody({ navigation }: Props) {
     try {
       const now = new Date();
 
-      // 1) create session -> shows in Player Dashboard Upcoming
-      await addDoc(collection(db, 'sessions'), {
-        playerId: req.playerId,
-        playerName: req.playerName,
-        coachId: req.coachId,
-        coachName: req.coachName || coachName,
+      // 1) create session so dashboards update
+      await setDoc(
+        doc(db, 'sessions', req.id),
+        {
+          playerId: req.playerId,
+          playerName: req.playerName,
+          coachId: req.coachId,
+          coachName: req.coachName || coachName,
 
-        date: req.date,
-        start: req.slotStart,
-        end: req.slotEnd,
+          date: req.date,
+          start: req.slotStart,
+          end: req.slotEnd,
 
-        status: 'upcoming',
+          status: 'upcoming',
 
-        createdAtMs: Date.now(),
-        createdAtLabel: now.toLocaleString(),
-      });
+          createdAtMs: Date.now(),
+          createdAtLabel: now.toLocaleString(),
+          requestId: req.id,
+        },
+        { merge: true }
+      );
 
       // 2) mark request accepted
       await updateDoc(doc(db, 'sessionRequests', req.id), {
         status: 'accepted',
+        updatedAt: serverTimestamp(),
         updatedAtMs: Date.now(),
-        updatedAtLabel: now.toLocaleString(),
       });
 
       // 3) book the slot so other players can’t request it
@@ -165,11 +168,10 @@ export default function CoachBookingRequestsScreenBody({ navigation }: Props) {
 
   const declineRequest = async (reqId: string) => {
     try {
-      const now = new Date();
       await updateDoc(doc(db, 'sessionRequests', reqId), {
         status: 'declined',
+        updatedAt: serverTimestamp(),
         updatedAtMs: Date.now(),
-        updatedAtLabel: now.toLocaleString(),
       });
       Alert.alert('Declined', 'Request declined.');
     } catch (e: any) {
@@ -180,38 +182,54 @@ export default function CoachBookingRequestsScreenBody({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.screenContainer}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.formScroll} keyboardShouldPersistTaps="handled">
-          <Text style={styles.sectionTitle}>Booking Requests</Text>
+          <View style={styles.topRightLogoContainer}>
+            <Image source={toplineLogo} style={styles.topRightLogo} />
+          </View>
 
-          <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
+          <View style={styles.coachBookingHeroCard}>
+            <View style={styles.coachBookingHeroRow}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={styles.coachBookingHeroTitle}>Booking Requests</Text>
+                <Text style={styles.coachBookingHeroSub}>
+                  Review the latest session requests and confirm availability.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.coachBookingStatsRow}>
+              <View style={styles.coachBookingStatPill}>
+                <Text style={styles.coachBookingStatValue}>{requests.length}</Text>
+                <Text style={styles.coachBookingStatLabel}>Pending</Text>
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.coachBookingSectionTitle}>Pending Requests</Text>
+          <View style={styles.coachBookingCard}>
             {requests.length === 0 ? (
-              <Text style={styles.emptyBody}>No booking requests.</Text>
+              <Text style={styles.coachBookingEmptyText}>No booking requests.</Text>
             ) : (
               requests.map(r => (
-                <View key={r.id} style={{ marginTop: 12 }}>
-                  <Text style={styles.inputLabel}>
-                    {r.playerName || 'Player'} • {formatRequestDate(r.date)}
+                <View key={r.id} style={styles.coachBookingRequestItem}>
+                  <View style={styles.coachBookingRequestHeaderRow}>
+                    <Text style={styles.coachBookingRequestTitle}>
+                      {r.playerName || 'Player'}
+                    </Text>
+                    <View style={styles.coachBookingBadge}>
+                      <Text style={styles.coachBookingBadgeText}>Requested</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.coachBookingRequestMeta}>
+                    {formatRequestDate(r.date)} • {r.slotStart} – {r.slotEnd}
                   </Text>
 
-                  <Text style={styles.playerWelcomeSubText}>
-                    Requested: {r.slotStart} – {r.slotEnd}
-                  </Text>
-
-                  <TouchableOpacity
-                    style={[styles.primaryButton, { marginTop: 10 }]}
-                    onPress={() => acceptRequest(r)}
-                  >
+                  <TouchableOpacity style={[styles.primaryButton, { marginTop: 10 }]} onPress={() => acceptRequest(r)}>
                     <Text style={styles.primaryButtonText}>Accept</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.secondaryButton, { marginTop: 8 }]}
-                    onPress={() => declineRequest(r.id)}
-                  >
+                  <TouchableOpacity style={[styles.secondaryButton, { marginTop: 8 }]} onPress={() => declineRequest(r.id)}>
                     <Text style={styles.secondaryButtonText}>Decline</Text>
                   </TouchableOpacity>
                 </View>
@@ -219,7 +237,6 @@ export default function CoachBookingRequestsScreenBody({ navigation }: Props) {
             )}
           </View>
 
-          {/* ✅ Back button ONCE, not inside each request */}
           <TouchableOpacity
             style={[styles.secondaryButton, { marginTop: 20, marginBottom: 30 }]}
             onPress={() => navigation.goBack()}

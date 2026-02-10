@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth , db} from "../firebase";
 import type { AppUserProfile, User } from "../types";
 import { getUserProfile, upsertUserProfile } from "../services/userProfile";
 import { logoutAuth } from "../services/authServices";
 import { initPushForUser } from "../utils/notifications";
+import { doc, onSnapshot } from "firebase/firestore";
 
 type AuthContextType = {
   firebaseUser: FirebaseUser | null;
@@ -70,26 +71,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setFirebaseUser(u);
+  let profileUnsub: (() => void) | null = null;
 
-      if (!u) {
+  const authUnsub = onAuthStateChanged(auth, (u) => {
+    setFirebaseUser(u);
+
+    // cleanup previous profile listener
+    if (profileUnsub) {
+      profileUnsub();
+      profileUnsub = null;
+    }
+
+    if (!u) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+
+    // 🔥 subscribe to profile doc so it updates immediately after SignUp writes it
+    const ref = doc(db, "users", u.uid);
+    profileUnsub = onSnapshot(
+      ref,
+      (snap) => {
+        setProfile(snap.exists() ? (snap.data() as any) : null);
+        setLoading(false);
+      },
+      (err) => {
+        console.log("profile snapshot error:", err);
         setProfile(null);
         setLoading(false);
-        return;
       }
+    );
+  });
 
-      setLoading(true);
-      try {
-        const p = await getUserProfile(u.uid);
-        setProfile(p);
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    return unsub;
-  }, []);
+  return () => {
+    authUnsub();
+    if (profileUnsub) profileUnsub();
+  };
+}, []);
 
   // ✅ Push init: only after we have uid + profile (non-blocking)
   useEffect(() => {

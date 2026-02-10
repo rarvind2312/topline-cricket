@@ -15,6 +15,7 @@ import {
   TextInput,
   Platform,
   KeyboardAvoidingView,
+  Image
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { fetchPlayersAndParents } from "../utils/publicUsers";
@@ -36,6 +37,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
+import { toplineLogo } from '../constants/assets';
 
 type PlayerLite = { uid: string; name: string };
 
@@ -342,19 +344,23 @@ useEffect(() => {
     onRight: () => void;
   }) => {
     return (
-      <View style={{ flexDirection: 'row', backgroundColor: '#c62828', borderRadius: 12, padding: 4, marginTop: 14 }}>
+      <View style={styles.coachFitnessSegWrap}>
         <TouchableOpacity
           onPress={onLeft}
-          style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: leftActive ? '#ffffff' : 'transparent', alignItems: 'center' }}
+          style={[styles.coachFitnessSegBtn, leftActive ? styles.coachFitnessSegBtnActive : null]}
         >
-          <Text style={{ fontWeight: '700', color: leftActive ? '#c62828' : '#ffffff' }}>{leftLabel}</Text>
+          <Text style={[styles.coachFitnessSegText, leftActive ? styles.coachFitnessSegTextActive : null]}>
+            {leftLabel}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={onRight}
-          style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: leftActive ? 'transparent' : '#ffffff', alignItems: 'center' }}
+          style={[styles.coachFitnessSegBtn, !leftActive ? styles.coachFitnessSegBtnActive : null]}
         >
-          <Text style={{ fontWeight: '700', color: leftActive ? '#ffffff' : '#c62828' }}>{rightLabel}</Text>
+          <Text style={[styles.coachFitnessSegText, !leftActive ? styles.coachFitnessSegTextActive : null]}>
+            {rightLabel}
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -364,10 +370,32 @@ useEffect(() => {
     <SafeAreaView style={styles.screenContainer}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.formScroll} keyboardShouldPersistTaps="handled">
-          <Text style={styles.playerWelcomeSubText}>
-            Assign fitness drills to players, or review what players submitted.
-          </Text>
+          <View style={styles.coachFitnessHeroCard}>
+            <View style={styles.coachFitnessHeroRow}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={styles.coachFitnessHeroTitle}>Review Fitness</Text>
+                <Text style={styles.coachFitnessHeroSub}>
+                  Assign drills, review submissions, and track completion.
+                </Text>
+              </View>
+              <Image source={toplineLogo} style={styles.coachFitnessHeroLogo} />
+            </View>
 
+            <View style={styles.coachFitnessStatsRow}>
+              <View style={[styles.coachFitnessStatPill, { marginRight: 8 }]}>
+                <Text style={styles.coachFitnessStatValue}>{playerSubmissions.length}</Text>
+                <Text style={styles.coachFitnessStatLabel}>Pending</Text>
+              </View>
+              <View style={[styles.coachFitnessStatPill, { marginRight: 8 }]}>
+                <Text style={styles.coachFitnessStatValue}>{assignedEntries.length}</Text>
+                <Text style={styles.coachFitnessStatLabel}>Assigned</Text>
+              </View>
+              <View style={styles.coachFitnessStatPill}>
+                <Text style={styles.coachFitnessStatValue}>{completedEntries.length}</Text>
+                <Text style={styles.coachFitnessStatLabel}>Completed</Text>
+              </View>
+            </View>
+          </View>
           <SegToggle
             leftLabel="Review Fitness"
             rightLabel="Assign Fitness"
@@ -378,27 +406,46 @@ useEffect(() => {
 
           {tab === 'review' ? (
             <>
-              <Text style={[styles.sectionTitle, { marginTop: 18 }]}>From Players (for review)</Text>
+              <Text style={styles.coachFitnessSectionTitle}>From Players</Text>
 
-              <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
+              <View style={styles.coachFitnessCard}>
+                <View style={styles.coachFitnessCardHeaderRow}>
+                  <Text style={styles.coachFitnessCardTitle}>Submissions</Text>
+                  <View style={styles.coachFitnessBadge}>
+                    <Text style={styles.coachFitnessBadgeText}>{playerSubmissions.length} Pending</Text>
+                  </View>
+                </View>
+
                 {playerSubmissions.length === 0 ? (
-                  <Text style={styles.emptyBody}>No fitness updates submitted by players yet.</Text>
+                  <Text style={styles.coachFitnessEmptyText}>
+                    No fitness updates submitted by players yet.
+                  </Text>
                 ) : (
                   playerSubmissions.map(x => (
-                    <View key={x.id} style={{ marginTop: 10 }}>
-                      <Text style={styles.inputLabel}>
-                        {x.playerName || 'Player'} • {x.createdAtLabel || ''}
-                      </Text>
+                    <View key={x.id} style={styles.coachFitnessListItem}>
+                      <View style={styles.coachFitnessListHeaderRow}>
+                        <Text style={styles.coachFitnessListTitle}>{x.playerName || 'Player'}</Text>
+                        <View style={styles.coachFitnessPill}>
+                          <Text style={styles.coachFitnessPillText}>Submitted</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.coachFitnessListMeta}>{x.createdAtLabel || ''}</Text>
 
                       {x.drills.slice(0, MAX_DRILLS).map((d, i) => (
-                        <Text key={i} style={styles.playerWelcomeSubText}>
-                          • {d.drill}
-                          {d.reps ? ` — Reps: ${d.reps}` : ''}
-                          {d.sets ? `, Sets: ${d.sets}` : ''}
-                        </Text>
+                        <View key={i} style={styles.coachFitnessBulletRow}>
+                          <Text style={styles.coachFitnessBulletDot}>•</Text>
+                          <Text style={styles.coachFitnessBulletText}>
+                            {d.drill}
+                            {d.reps ? ` — Reps: ${d.reps}` : ''}
+                            {d.sets ? `, Sets: ${d.sets}` : ''}
+                          </Text>
+                        </View>
                       ))}
 
-                      <TouchableOpacity style={[styles.primaryButton, { marginTop: 10 }]} onPress={() => markPlayerSubmissionCompleted(x)}>
+                      <TouchableOpacity
+                        style={[styles.primaryButton, styles.coachFitnessActionBtn]}
+                        onPress={() => markPlayerSubmissionCompleted(x)}
+                      >
                         <Text style={styles.primaryButtonText}>Mark Reviewed</Text>
                       </TouchableOpacity>
                     </View>
@@ -410,12 +457,20 @@ useEffect(() => {
 
           {tab === 'assign' ? (
             <>
-              <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Assign a drill</Text>
+              <Text style={styles.coachFitnessSectionTitle}>Assign a Drill</Text>
 
-              <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
-                <Text style={styles.inputLabel}>Select player</Text>
+              <View style={styles.coachFitnessCard}>
+                <View style={styles.coachFitnessCardHeaderRow}>
+                  <Text style={styles.coachFitnessCardTitle}>Player Selection</Text>
+                </View>
+
+        
                 <View style={styles.pickerCard}>
-                  <Picker enabled={!loadingPlayers} selectedValue={selectedPlayerId} onValueChange={value => setSelectedPlayerId(String(value))}>
+                  <Picker
+                    enabled={!loadingPlayers}
+                    selectedValue={selectedPlayerId}
+                    onValueChange={value => setSelectedPlayerId(String(value))}
+                  >
                     <Picker.Item label={loadingPlayers ? 'Loading players…' : 'Player'} value="" />
                     {players.map(p => (
                       <Picker.Item key={p.uid} label={p.name} value={p.uid} />
@@ -424,15 +479,38 @@ useEffect(() => {
                 </View>
 
                 {drills.map((d, idx) => (
-                  <View key={idx} style={{ marginTop: idx === 0 ? 10 : 14 }}>
-                    <Text style={styles.inputLabel}>Drill {idx + 1}</Text>
-                    <TextInput style={styles.input} placeholder="e.g., Plank hold" value={d.drill} onChangeText={t => updateDrill(idx, { drill: t })} />
+                  <View key={idx} style={styles.coachFitnessDrillBlock}>
+                    <View style={styles.coachFitnessDrillHeader}>
+                      <Text style={styles.inputLabel}>Drill {idx + 1}</Text>
+                      {drills.length > 1 ? (
+                        <TouchableOpacity onPress={() => removeDrill(idx)} activeOpacity={0.9}>
+                          <Text style={styles.coachFitnessRemoveText}>Remove</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g., Plank hold"
+                      value={d.drill}
+                      onChangeText={t => updateDrill(idx, { drill: t })}
+                    />
 
                     <Text style={[styles.inputLabel, { marginTop: 10 }]}>Reps</Text>
-                    <TextInput style={styles.input} placeholder="e.g., 10" value={d.reps} onChangeText={t => updateDrill(idx, { reps: t })} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g., 10"
+                      value={d.reps}
+                      onChangeText={t => updateDrill(idx, { reps: t })}
+                    />
 
                     <Text style={[styles.inputLabel, { marginTop: 10 }]}>Sets</Text>
-                    <TextInput style={styles.input} placeholder="e.g., 3" value={d.sets} onChangeText={t => updateDrill(idx, { sets: t })} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g., 3"
+                      value={d.sets}
+                      onChangeText={t => updateDrill(idx, { sets: t })}
+                    />
 
                     <Text style={[styles.inputLabel, { marginTop: 10 }]}>Notes (optional)</Text>
                     <TextInput
@@ -442,12 +520,6 @@ useEffect(() => {
                       onChangeText={t => updateDrill(idx, { notes: t })}
                       multiline
                     />
-
-                    {drills.length > 1 ? (
-                      <TouchableOpacity style={[styles.secondaryButton, { marginTop: 10 }]} onPress={() => removeDrill(idx)}>
-                        <Text style={styles.secondaryButtonText}>Remove drill</Text>
-                      </TouchableOpacity>
-                    ) : null}
                   </View>
                 ))}
 
@@ -465,47 +537,79 @@ useEffect(() => {
               </View>
 
               {/* Tracker */}
-              <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Tracker</Text>
+              <Text style={styles.coachFitnessSectionTitle}>Tracker</Text>
 
-              <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
-                <Text style={styles.sectionTitle}>Assigned</Text>
+              <View style={styles.coachFitnessCard}>
+                <View style={styles.coachFitnessCardHeaderRow}>
+                  <Text style={styles.coachFitnessCardTitle}>Assigned</Text>
+                  <View style={styles.coachFitnessBadge}>
+                    <Text style={styles.coachFitnessBadgeText}>{assignedEntries.length}</Text>
+                  </View>
+                </View>
                 {assignedEntries.length === 0 ? (
-                  <Text style={styles.emptyBody}>No fitness drills assigned yet.</Text>
+                  <Text style={styles.coachFitnessEmptyText}>No fitness drills assigned yet.</Text>
                 ) : (
                   assignedEntries.map(x => (
-                    <View key={x.id} style={{ marginTop: 10 }}>
-                      <Text style={styles.inputLabel}>
-                        {x.playerName || 'Player'} • Assigned {x.createdAtLabel || ''}
+                    <View key={x.id} style={styles.coachFitnessListItem}>
+                      <View style={styles.coachFitnessListHeaderRow}>
+                        <Text style={styles.coachFitnessListTitle}>{x.playerName || 'Player'}</Text>
+                        <View style={styles.coachFitnessPill}>
+                          <Text style={styles.coachFitnessPillText}>Assigned</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.coachFitnessListMeta}>
+                        Assigned {x.createdAtLabel || ''}
                       </Text>
                       {x.drills.slice(0, MAX_DRILLS).map((d, i) => (
-                        <Text key={i} style={styles.playerWelcomeSubText}>
-                          • {d.drill}
-                          {d.reps ? ` — Reps: ${d.reps}` : ''}
-                          {d.sets ? `, Sets: ${d.sets}` : ''}
-                        </Text>
+                        <View key={i} style={styles.coachFitnessBulletRow}>
+                          <Text style={styles.coachFitnessBulletDot}>•</Text>
+                          <Text style={styles.coachFitnessBulletText}>
+                            {d.drill}
+                            {d.reps ? ` — Reps: ${d.reps}` : ''}
+                            {d.sets ? `, Sets: ${d.sets}` : ''}
+                          </Text>
+                        </View>
                       ))}
                     </View>
                   ))
                 )}
               </View>
 
-              <View style={[styles.toplineSectionCard, { marginTop: 14 }]}>
-                <Text style={styles.sectionTitle}>Completed</Text>
+              <View style={[styles.coachFitnessCard, { marginTop: 14 }]}>
+                <View style={styles.coachFitnessCardHeaderRow}>
+                  <Text style={styles.coachFitnessCardTitle}>Completed</Text>
+                  <View style={[styles.coachFitnessBadge, styles.coachFitnessBadgeSuccess]}>
+                    <Text style={[styles.coachFitnessBadgeText, styles.coachFitnessBadgeSuccessText]}>
+                      {completedEntries.length}
+                    </Text>
+                  </View>
+                </View>
                 {completedEntries.length === 0 ? (
-                  <Text style={styles.emptyBody}>No completed drills yet.</Text>
+                  <Text style={styles.coachFitnessEmptyText}>No completed drills yet.</Text>
                 ) : (
                   completedEntries.map(x => (
-                    <View key={x.id} style={{ marginTop: 10 }}>
-                      <Text style={styles.inputLabel}>
-                        {x.playerName || 'Player'} • Completed {x.completedAtLabel || x.createdAtLabel || ''}
+                    <View key={x.id} style={styles.coachFitnessListItem}>
+                      <View style={styles.coachFitnessListHeaderRow}>
+                        <Text style={styles.coachFitnessListTitle}>{x.playerName || 'Player'}</Text>
+                        <View style={[styles.coachFitnessPill, styles.coachFitnessPillSuccess]}>
+                          <Text style={[styles.coachFitnessPillText, styles.coachFitnessPillSuccessText]}>
+                            Completed
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.coachFitnessListMeta}>
+                        Completed {x.completedAtLabel || x.createdAtLabel || ''}
                         {x.completedByPlayerName ? ` • by ${x.completedByPlayerName}` : ''}
                       </Text>
                       {x.drills.slice(0, MAX_DRILLS).map((d, i) => (
-                        <Text key={i} style={styles.playerWelcomeSubText}>
-                          • {d.drill}
-                          {d.reps ? ` — Reps: ${d.reps}` : ''}
-                          {d.sets ? `, Sets: ${d.sets}` : ''}
-                        </Text>
+                        <View key={i} style={styles.coachFitnessBulletRow}>
+                          <Text style={styles.coachFitnessBulletDot}>•</Text>
+                          <Text style={styles.coachFitnessBulletText}>
+                            {d.drill}
+                            {d.reps ? ` — Reps: ${d.reps}` : ''}
+                            {d.sets ? `, Sets: ${d.sets}` : ''}
+                          </Text>
+                        </View>
                       ))}
                     </View>
                   ))

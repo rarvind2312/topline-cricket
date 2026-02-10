@@ -188,8 +188,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
           const reviewed = docs
             .filter((v) => {
               const status = String(v.status || '').trim().toLowerCase();
-              const hasFeedback =
-                typeof v.feedback === 'string' && v.feedback.trim().length > 0;
+              const hasFeedback = typeof v.feedback === 'string' && v.feedback.trim().length > 0;
               return status === 'reviewed' && hasFeedback;
             })
             .map((v) => {
@@ -241,10 +240,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
           const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 
           const reviewedFitness = docs
-            .filter((x) => {
-              // only entries coach reviewed
-              return !!x.coachReviewedAtMs || !!x.coachReviewedAtLabel;
-            })
+            .filter((x) => !!x.coachReviewedAtMs || !!x.coachReviewedAtLabel)
             .map((x) => {
               const dt =
                 safeToDate(x.coachReviewedAtMs) ||
@@ -252,7 +248,6 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
                 safeToDate(x.completedAtMs) ||
                 safeToDate(x.createdAtMs);
 
-              // If later you store a coach note, show it here:
               const coachNote =
                 typeof x.coachReviewNotes === 'string' && x.coachReviewNotes.trim().length > 0
                   ? x.coachReviewNotes
@@ -432,16 +427,13 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
             </View>
 
             <View style={styles.headerTextBlock}>
-              <Text style={styles.headerHi}>Hi,</Text>
               <Text style={styles.headerName} numberOfLines={1}>
                 {fullName}
               </Text>
               <Text style={styles.headerRole} numberOfLines={1}>
                 {playerRoleLabel}
               </Text>
-              <Text style={styles.headerWelcome}>
-                Welcome to Topline Cricket — your journey to the next level starts here.
-              </Text>
+              
             </View>
 
             <Image source={TOPLINE_LOGO} style={styles.headerLogo} />
@@ -591,8 +583,12 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
             activeOpacity={0.9}
             onPress={() => navigation.navigate('PlayerVideos')}
           >
-            <Text style={styles.quickActionEmoji}>🎥</Text>
-            <Text style={styles.quickActionText}>My Practice Videos</Text>
+            <View style={styles.quickActionIconWrap}>
+              <Text style={styles.quickActionEmoji}>🎥</Text>
+            </View>
+            <Text style={styles.quickActionText} numberOfLines={2}>
+              My Practice Videos
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -600,8 +596,12 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
             activeOpacity={0.9}
             onPress={() => navigation.navigate('PlayerCoachingVideos')}
           >
-            <Text style={styles.quickActionEmoji}>📺</Text>
-            <Text style={styles.quickActionText}>Coaching Videos</Text>
+            <View style={styles.quickActionIconWrap}>
+              <Text style={styles.quickActionEmoji}>📺</Text>
+            </View>
+            <Text style={styles.quickActionText} numberOfLines={2}>
+              Coaching Videos
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -609,8 +609,12 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
             activeOpacity={0.9}
             onPress={() => navigation.navigate('PlayerFitness')}
           >
-            <Text style={styles.quickActionEmoji}>❤️‍🔥</Text>
-            <Text style={styles.quickActionText}>Fitness</Text>
+            <View style={styles.quickActionIconWrap}>
+              <Text style={styles.quickActionEmoji}>🏋️</Text>
+            </View>
+            <Text style={styles.quickActionText} numberOfLines={2}>
+              Fitness
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -618,8 +622,12 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
             activeOpacity={0.9}
             onPress={() => navigation.navigate('PlayerBookSessions')}
           >
-            <Text style={styles.quickActionEmoji}>📅</Text>
-            <Text style={styles.quickActionText}>Session Booking</Text>
+            <View style={styles.quickActionIconWrap}>
+              <Text style={styles.quickActionEmoji}>📅</Text>
+            </View>
+            <Text style={styles.quickActionText} numberOfLines={2}>
+              Session Booking
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -655,7 +663,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
                 <Text style={styles.statsValue}>{keyStats.runs}</Text>
               </View>
               <View style={styles.statsRow}>
-                <Text style={styles.statsLabel}>Highest</Text>
+                <Text style={styles.statsLabel}>Highest Score</Text>
                 <Text style={styles.statsValue}>{keyStats.highestScore}</Text>
               </View>
               <View style={styles.statsRow}>

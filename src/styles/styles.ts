@@ -1,29 +1,2032 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
+
+const COACH_RED = '#870909';
 
 export const styles = StyleSheet.create({
-  // General
-  authContainer: {
+// ---------- AUTH LANDING (PREMIUM, CROSS-PLATFORM) ----------
+authContainer: {
   flex: 1,
-  backgroundColor: '#ffffff',
-  paddingHorizontal: 28,
-  paddingTop: 40,
-  paddingBottom: 24,
-  justifyContent: 'space-between',
+  backgroundColor: "#fff",
 },
-  screenContainer: {
+
+authLandingWrap: {
   flex: 1,
-  backgroundColor: '#ffffff',
-  paddingHorizontal: 28,
-  paddingTop: 0,
-  paddingBottom: 20,
+  justifyContent: "space-between",
+  paddingHorizontal: 22,
+  paddingTop: 22,
+  paddingBottom: 28, 
 },
+
+authLandingHeader: {
+  alignItems: "center",
+  marginTop: 8,
+},
+
+authLandingLogoCard: {
+  width: 170,
+  height: 170,
+  borderRadius: 30,
+  backgroundColor: "#fff",
+  alignItems: "center",
+  justifyContent: "center",
+
+  // ✅ iOS shadow
+  shadowColor: "#000",
+  shadowOpacity: 0.08,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 10 },
+
+  // ✅ Android shadow
+  elevation: 2,
+
+  borderWidth: 1,
+  borderColor: "#f3f4f6",
+},
+
+authLandingLogo: {
+  width: 140,
+  height: 140,
+  resizeMode: "contain",
+},
+
+authLandingTitle: {
+  marginTop: 18,
+  fontSize: 24,
+  fontWeight: "800",
+  color: "#111",
+  textAlign: "center",
+},
+
+authLandingSubtitle: {
+  marginTop: 10,
+  fontSize: 25,
+  color: "#000",
+  textAlign: "center",
+  lineHeight: 30,
+  paddingHorizontal: 15, 
+},
+
+authLandingCtaCard: {
+  backgroundColor: "#fff",
+  borderRadius: 18,
+  padding: 16,
+
+  // ✅ iOS shadow
+  shadowColor: "#000",
+  shadowOpacity: 0.06,
+  shadowRadius: 18,
+  shadowOffset: { width: 0, height: 10 },
+
+  // ✅ Android
+  elevation: 2,
+
+  borderWidth: 1,
+  borderColor: "#f2f2f2",
+},
+
+authLandingPrimaryBtn: {
+  height: 54,
+  borderRadius: 14,
+  backgroundColor: "#E10600",
+  alignItems: "center",
+  justifyContent: "center",
+
+  // ✅ iOS shadow
+  shadowColor: "#000",
+  shadowOpacity: 0.18,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 6 },
+
+  // ✅ Android
+  elevation: 2,
+},
+
+authLandingPrimaryBtnText: {
+  color: "#fff",
+  fontSize: 16,
+  fontWeight: "800",
+},
+
+authLandingSecondaryBtn: {
+  height: 54,
+  borderRadius: 14,
+  backgroundColor: "#fff",
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1.5,
+  borderColor: "#E10600",
+  marginTop: 12,
+},
+
+authLandingSecondaryBtnText: {
+  color: "#E10600",
+  fontSize: 16,
+  fontWeight: "800",
+},
+
+authLandingFinePrint: {
+  marginTop: 14,
+  fontSize: 16,
+  color: "#111827",
+  textAlign: "center",
+  lineHeight: 16,
+},
+
+  /* ---------- GENERIC ---------- */
+  flex1: {
+    flex: 1,
+  },
+
+  /* ---------- AUTH SCREENS ---------- */
+  authScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "ios" ? 12 : 16,   // Android needs a bit more top
+    paddingBottom: Platform.OS === "ios" ? 36 : 28, // balanced bottom spacing
+  },
+
+  authHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    minHeight: 40, // keeps header stable across devices
+  },
+
+  backButton: {
+    paddingVertical: 8,   // ✅ bigger tap area for Android
+    paddingHorizontal: 8,
+    borderRadius: 10,     // optional, helps if you add pressed style later
+  },
+
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: Platform.OS === "ios" ? "600" : "500",
+    color: "#111",
+  },
+
+  authLogoSmall: {
+    width: 100,
+    height: 100,
+    resizeMode: "contain",
+    alignSelf: "center",
+  },
+
+  authTagline: {
+    textAlign: "center",
+    fontSize: 20,
+    color: "#000",
+    marginTop: 6,
+    marginBottom: 16,
+    letterSpacing: 0.2,
+    paddingHorizontal: 8,  // prevents wide screens looking odd
+    lineHeight: 20,
+    fontWeight: "500",
+  },
+
+  authRowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 18,
+    gap: 10, // RN 0.71+ supports this; safe on Expo modern versions
+  },
+
+  buttonDisabled: {
+    opacity: 0.55,
+  },
+
+  // ✅ Better than hardcoding 40/24: keeps Android nav bar + iOS home indicator happy
+  authBottomSpacer: {
+    height: Platform.OS === "ios" ? 44 : 28,
+  },
+
+
+
+/* ===========================
+   SIGN UP – COMMON LAYOUT
+   =========================== */
+
+
+formScroll: {
+  paddingHorizontal: 18,
+  paddingTop: 14,
+  paddingBottom: 32,
+},
+
+
+
+/* ===========================
+   HEADINGS & TEXT
+   =========================== */
+
+/* Main heading (Sign Up) */
+h1: {
+  fontSize: 24,
+  fontWeight: '700',
+  color: '#111111',
+  textAlign: 'center',
+  marginBottom: 16,
+},
+
+
+fieldLabel: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#111827',
+  marginTop: 14,
+  marginBottom: 6,
+},
+
+helperText: {
+  fontSize: 13,
+  color: '#6B7280',
+  marginTop: 4,
+},
+
+/* ===========================
+   INPUTS
+   =========================== */
+
+textInput: {
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+  fontSize: 14,
+  color: '#111827',
+},
+
+input: {
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+  fontSize: 20,
+  color: '#111827',
+  marginBottom: 6,
+},
+
+/* ===========================
+   ROLE TOGGLE (Player / Coach)
+   =========================== */
+
+roleRow: {
+  flexDirection: 'row',
+  backgroundColor: '#F3F4F6',
+  borderRadius: 12,
+  padding: 4,
+   gap: 12,
+  marginBottom: 14,
+},
+
+roleChip: {
+ flex: 1,
+  borderRadius: 999,
+  paddingVertical: 12,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 1,
+  borderColor: '#E10600',
+  backgroundColor: '#FFFFFF',
+  
+},
+
+roleChipSelected: {
+  backgroundColor: '#E10600',
+},
+
+roleChipText: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#000',
+},
+
+roleChipTextSelected: {
+  color: '#FFFFFF',
+  fontWeight: '800',
+},
+
+/* ===========================
+   CHECKBOX (Player / Coach)
+   =========================== */
+
+checkboxRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 8,
+},
+
+checkboxBox: {
+  width: 20,
+  height: 20,
+  borderRadius: 4,
+  borderWidth: 1.5,
+  borderColor: '#6B7280',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 8,
+  backgroundColor: '#FFFFFF',
+},
+
+checkboxTick: {
+  width: 12,
+  height: 12,
+  backgroundColor: '#E10600',
+  borderRadius: 3,
+},
+
+checkboxLabel: {
+  fontSize: 14,
+  color: '#111827',
+},
+
+/* ===========================
+   LEVEL PICKER (Touchable)
+   =========================== */
+
+pickerInput: {
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+  marginBottom: 10,
+},
+
+pickerText: {
+  fontSize: 14,
+  color: '#111827',
+},
+
+pickerPlaceholder: {
+  fontSize: 14,
+  color: '#9CA3AF',
+},
+
+/* ===========================
+   PRIMARY BUTTON
+   =========================== */
+
+primaryButton: {
+  height: 52,
+  borderRadius: 12,
+  backgroundColor: '#E10600',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 18,
+
+  /* iOS shadow */
+  shadowColor: '#000',
+  shadowOpacity: 0.15,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 4 },
+
+  /* Android */
+  elevation: 3,
+},
+
+primaryButtonText: {
+  color: '#FFFFFF',
+  fontSize: 16,
+  fontWeight: '700',
+},
+
+/* ===========================
+   LINK BUTTONS
+   =========================== */
+
+linkButton: {
+  alignSelf: 'center',
+  marginTop: 16,
+  paddingVertical: 6,
+},
+
+linkButtonText: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#E10600',
+  textAlign: 'center',
+},
+
+/* ===========================
+   MODALS (Consent / Picker)
+   =========================== */
+
 modalOverlay: {
   flex: 1,
   backgroundColor: 'rgba(0,0,0,0.45)',
   justifyContent: 'center',
-  padding: 16,
+  padding: 18,
 },
 
+
+modalTitle: {
+  fontSize: 18,
+  fontWeight: '700',
+  marginBottom: 10,
+  color: '#111111',
+},
+
+modalScrollBox: {
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 10,
+  padding: 12,
+  marginBottom: 14,
+},
+
+modalBodyText: {
+  fontSize: 14,
+  lineHeight: 20,
+  color: '#111827',
+},
+
+  
+
+/* ===========================
+   PLAYER DASHBOARD (PREMIUM)
+   =========================== */
+
+screen: {
+  flex: 1,
+  backgroundColor: '#ffffff',
+},
+
+container: {
+  paddingHorizontal: 16,
+  paddingTop: 14,
+  paddingBottom: 28,
+},
+
+/* Header */
+headerCard: {
+  borderRadius: 20,
+  backgroundColor: '#bb2b2b',
+  padding: 18,
+  marginBottom: 10,
+
+  shadowOpacity: 0.50,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 3,
+},
+
+headerRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+avatarCircle: {
+  width: 52,
+  height: 52,
+  borderRadius: 26,
+  backgroundColor: 'rgba(255,255,255,0.14)',
+  borderWidth: 1,
+  borderColor: '#fff',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 12,
+},
+
+avatarText: {
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: '800',
+  letterSpacing: 0.5,
+},
+
+headerTextBlock: {
+  flex: 1,
+  paddingRight: 10,
+},
+
+headerHi: {
+  color: 'rgba(255,255,255,0.9)',
+  fontSize: 12,
+  fontWeight: '700',
+},
+
+headerName: {
+  color: '#fff',
+  fontSize: 18,
+  fontWeight: '900',
+  marginTop: 2,
+},
+
+headerRole: {
+  color: 'rgba(255,255,255,0.85)',
+  fontSize: 15,
+  fontWeight: '700',
+  marginTop: 2,
+},
+
+headerWelcome: {
+  color: 'rgba(255,255,255,0.85)',
+  fontSize: 12,
+  lineHeight: 16,
+  marginTop: 6,
+},
+
+
+/* Sections */
+sectionHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginTop: 10,
+},
+
+
+sectionBlock: {
+  marginTop: 10,
+},
+
+/* Cards */
+toplineSectionCard: {
+  borderRadius: 16,
+  backgroundColor: '#ffffff',
+  padding: 14,
+  borderWidth: 1,
+  borderColor: '#F3F4F6',
+
+  shadowOpacity: 0.06,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+
+divider: {
+  height: 1,
+  backgroundColor: '#F3F4F6',
+  marginVertical: 12,
+},
+
+bigTitle: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#4c0303',
+},
+
+titleRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+
+emptyTitle: {
+  fontSize: 15,
+  fontWeight: '800',
+  color: '#111111',
+},
+
+emptyBody: {
+  fontSize: 16,
+  color: '#6B7280',
+  lineHeight: 20,
+},
+
+feedbackText: {
+  fontSize: 14,
+  color: '#111827',
+  marginTop: 6,
+  lineHeight: 20,
+},
+
+/* Pills */
+pill: {
+  borderRadius: 600,
+  padding:10,
+  backgroundColor: '#E10600',
+  borderWidth: 1,
+  borderColor: 'rgba(192, 43, 43, 0.18)',
+  elevation: 3,
+},
+
+pillText: {
+  fontSize: 15,
+  fontWeight: '800',
+  color: '#ffffff',
+},
+
+/* Shimmer */
+shimmerBox: {
+  height: 46,
+  borderRadius: 14,
+  overflow: 'hidden',
+  backgroundColor: '#F3F4F6',
+},
+
+shimmerOverlay: {
+  position: 'absolute',
+  top: 0,
+  bottom: 0,
+  width: 140,
+},
+
+/* Pending request text */
+inputLabel: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#111111',
+  marginBottom: 10
+},
+
+
+/* Quick Actions */
+quickActionsCard: {
+  marginTop: 10,
+  borderRadius: 16,
+  backgroundColor: '#ffffff',
+  padding: 12,
+  borderWidth: 1,
+  borderColor: '#F3F4F6',
+
+  shadowOpacity: 0.06,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+},
+
+quickActionTile: {
+  width: '23%',
+  borderRadius: 14,
+  backgroundColor: '#FAFAFA',
+  borderWidth: 1,
+  borderColor: '#EEF2F7',
+  paddingVertical: 12,
+  paddingHorizontal: 8,
+  alignItems: 'center',
+  justifyContent: 'flex-start',
+},
+
+quickActionIconWrap: {
+  height: 28,              // ✅ fixes alignment
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+
+quickActionEmoji: {
+  fontSize: 22,
+},
+
+quickActionText: {
+  fontSize: 12,
+  fontWeight: '800',
+  color: '#111111',
+  textAlign: 'center',
+  lineHeight: 14,
+  minHeight: 28,           // ✅ keeps labels aligned (2 lines)
+},
+
+/* Stats card */
+card: {
+  marginTop: 10,
+  borderRadius: 16,
+  backgroundColor: '#ffffff',
+  padding: 14,
+  borderWidth: 1,
+  borderColor: '#F3F4F6',
+
+  shadowOpacity: 0.06,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+
+statsHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+
+statsCardTitle: {
+  fontSize: 18,
+  fontWeight: '700',
+  color: '#580707',
+},
+
+editLink: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#730606',
+},
+
+statsCardSubtitle: {
+  fontSize: 13,
+  color: '#6B7280',
+  marginTop: 6,
+  lineHeight: 18,
+},
+statsRowAlt: {
+  backgroundColor: '#FAFAFB',
+},
+
+statsButton: {
+  marginTop: 12,
+  height: 48,
+  borderRadius: 14,
+  backgroundColor: '#E10600',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+statsButtonText: {
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: '900',
+},
+
+/* Stats Modal (existing keys used in your screen) */
+modalBackdrop: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.45)',
+  justifyContent: 'center',
+  padding: 18,
+},
+
+modalCard: {
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  padding: 16,
+  borderWidth: 1,
+  borderColor: '#F3F4F6',
+
+  shadowOpacity: 0.10,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 3,
+},
+
+
+modalRow: {
+  flexDirection: 'row',
+  gap: 12,
+  marginBottom: 12,
+},
+
+modalField: {
+  flex: 1,
+},
+
+modalLabel: {
+  fontSize: 12,
+  fontWeight: '800',
+  color: '#6B7280',
+  marginBottom: 6,
+},
+
+modalInput: {
+  height: 46,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  paddingHorizontal: 12,
+  fontSize: 14,
+  color: '#111111',
+  backgroundColor: '#ffffff',
+},
+
+modalButtonsRow: {
+  flexDirection: 'row',
+  gap: 12,
+  marginTop: 6,
+},
+
+modalBtn: {
+  flex: 1,
+  height: 48,
+  borderRadius: 14,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+modalBtnSecondary: {
+  backgroundColor: '#ffffff',
+  borderWidth: 1.5,
+  borderColor: '#E5E7EB',
+},
+
+modalBtnSecondaryText: {
+  fontSize: 14,
+  fontWeight: '900',
+  color: '#111111',
+},
+
+modalBtnPrimary: {
+  backgroundColor: '#E10600',
+},
+
+modalBtnPrimaryText: {
+  fontSize: 14,
+  fontWeight: '900',
+  color: '#ffffff',
+},
+
+
+/* ===========================
+   STATS TABLE (PREMIUM UPGRADE)
+   =========================== */
+
+statsTable: {
+  marginTop: 12,
+  borderRadius: 14,
+  overflow: 'hidden',
+  backgroundColor: '#ffffff',
+  borderWidth: 1,
+  borderColor: '#EEF2F7',
+
+  shadowOpacity: 0.05,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 1,
+},
+
+statsRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingVertical: 14,
+  paddingHorizontal: 14,
+  backgroundColor: '#ffffff',
+  borderBottomWidth: 1,
+  borderBottomColor: '#F1F5F9',
+},
+
+statsRowLast: {
+  borderBottomWidth: 0,
+},
+
+statsLabel: {
+  fontSize: 15,
+  color: '#610404',
+  fontWeight: '700',
+  letterSpacing: 0.2,
+},
+
+statsValue: {
+  fontSize: 16,
+  color: '#111111',
+  fontWeight: '900',
+  letterSpacing: 0.2,
+},
+
+
+
+
+/* ===========================
+   PLAYER VIDEOS (PREMIUM)
+   =========================== */
+
+screenContainer: {
+  flex: 1,
+  backgroundColor: "#FFFFFF",
+},
+
+
+/* Title + helper text (re-use across screens) */
+sectionTitle: {
+  fontSize: 18,
+  fontWeight: "700",
+  color: "#7f0606",
+  marginTop: 16,
+  marginBottom: 5,
+},
+
+coachSectionTitle: {
+  fontSize: 20,
+  fontWeight: "700",
+  color: COACH_RED,
+  marginTop: 16,
+  marginBottom: 5,
+},
+
+coachBigTitle: {
+  fontSize: 18,
+  fontWeight: "800",
+  color: COACH_RED,
+},
+
+
+playerCardEmptyText: {
+  fontSize: 14,
+  lineHeight: 20,
+  color: "#2c2828",
+  marginTop: 12,
+},
+
+/* Topline logo used as small badge */
+headerLogo: {
+  width: 60,
+  height: 60,
+  resizeMode: "cover",
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: "#F1F5F9",
+},
+
+/* Upload card */
+videoUploadCard: {
+  backgroundColor: "#F1F5F9",
+  borderRadius: 16,
+  paddingVertical: 15,
+  paddingHorizontal: 15,
+  borderWidth: 1,
+  borderColor: "#380202",
+  marginTop: 10,
+  shadowOpacity: 0.10,
+  shadowRadius: 1,
+  shadowOffset: { width: 0, height: 15 },
+  elevation: 4,
+},
+
+videoUploadHint: {
+  fontSize: 15,
+  fontWeight: "600",
+  color: "#7f0606",
+  textAlign:"center"
+},
+
+videoUploadMeta: {
+  marginTop: 6,
+  fontSize: 12,
+  fontWeight: "700",
+  color: "#530606",
+  textAlign: "center"
+},
+
+/* Video item card */
+videoItemCard: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 18,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: "#EEF2F7",
+  marginBottom: 14,
+
+  shadowOpacity: 0.06,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+
+videoItemTitle: {
+  fontSize: 16,
+  fontWeight: "700",
+  color: "#5a0404",
+},
+
+videoItemMeta: {
+  marginTop: 4,
+  fontSize: 13,
+  fontWeight: "600",
+  color: "#0a1801",
+},
+
+/* Video player */
+videoPlayer: {
+  width: "100%",
+  height: 200,
+  borderRadius: 14,
+  overflow: "hidden",
+  backgroundColor: "#0B0F19",
+  marginTop: 12,
+  marginBottom: 12,
+},
+
+/* Coach select */
+assignLabel: {
+  fontSize: 16,
+  fontWeight: "700",
+  color: "#7f0606",
+  marginBottom: 8,
+},
+
+coachAssignLabel: {
+  fontSize: 17,
+  fontWeight: "700",
+  color: COACH_RED,
+  marginBottom: 8,
+},
+
+pickerCard: {
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: "#E10600",
+  backgroundColor: "#FFFFFF",
+  overflow: "hidden",
+  marginBottom: 8,
+  shadowOpacity: 0.05,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 1,
+},
+
+/* Selected coach row */
+selectedRow: {
+  marginTop: 6,
+  flexDirection: "row",
+  alignItems: "center",
+},
+
+selectedLabel: {
+  fontSize: 13,
+  fontWeight: "700",
+  color: "#6B7280",
+},
+
+
+/* Shared pill */
+sharedPill: {
+  alignSelf: "flex-start",
+  marginTop: 12,
+  backgroundColor: "rgba(16,185,129,0.10)",
+  borderWidth: 1,
+  borderColor: "rgba(16,185,129,0.25)",
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 999,
+},
+
+sharedPillText: {
+  fontSize: 12,
+  fontWeight: "900",
+  color: "#0F766E",
+},
+
+/* Confirm button */
+confirmButton: {
+  marginTop: 12,
+  height: 52,
+  borderRadius: 14,
+  backgroundColor: "#E10600",
+  alignItems: "center",
+  justifyContent: "center",
+
+  shadowOpacity: 0.16,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 8 },
+  elevation: 2,
+},
+
+confirmButtonText: {
+  color: "#FFFFFF",
+  fontSize: 15,
+  fontWeight: "900",
+  letterSpacing: 0.2,
+},
+
+/* Secondary button (Return to dashboard) */
+secondaryButton: {
+  height: 52,
+  borderRadius: 14,
+  backgroundColor: "#FFFFFF",
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1.5,
+  borderColor: "#490604",
+},
+
+secondaryButtonText: {
+  color: "#7f0606",
+  fontSize: 15,
+  fontWeight: "600",
+  
+},
+
+/* ===========================
+   TOP-RIGHT FIXED LOGO
+   =========================== */
+
+topRightLogoContainer: {
+  position: "absolute",
+  top: 8,          // SafeArea-friendly
+  right: 16,
+  zIndex: 50,
+},
+
+topRightLogo: {
+  width: 60,
+  height: 60,
+  borderRadius: 12,
+  resizeMode: "cover",
+  backgroundColor: "#FFFFFF",
+
+  shadowOpacity: 0.15,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 3,
+},
+
+
+
+/* ===========================
+   FITNESS (PLAYER) — PREMIUM
+   =========================== */
+
+fitnessTopCard: {
+  backgroundColor: '#fff',
+  borderRadius: 18,
+  padding: 16,
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+  marginBottom: 14,
+
+  shadowOpacity: 0.05,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+
+fitnessTopTitle: {
+  fontSize: 20,
+  fontWeight: '700',
+  color: '#7f0606',
+  marginBottom: 6,
+},
+
+fitnessTopSubtitle: {
+  fontSize: 14,
+  color: '#6b7280',
+  lineHeight: 18,
+  marginBottom: 12,
+},
+
+/* Segmented toggle (same feel as signup, but premium) */
+fitnessToggleWrap: {
+  flexDirection: 'row',
+  backgroundColor: '#E10600',
+  borderRadius: 14,
+  padding: 4,
+},
+
+fitnessToggleBtn: {
+  flex: 1,
+  paddingVertical: 14,
+  borderRadius: 10,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+fitnessToggleBtnActive: {
+  backgroundColor: '#fff',
+},
+
+fitnessToggleText: {
+  fontWeight: '700',
+  color: '#fff',
+  fontSize: 15,
+},
+
+fitnessToggleTextActive: {
+  color: '#7f0606',
+},
+
+/* Player picker (Coach Fitness) */
+fitnessPlayerRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingVertical: 12,
+  paddingHorizontal: 12,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+  backgroundColor: '#ffffff',
+  marginTop: 8,
+},
+
+fitnessPlayerRowSelected: {
+  borderColor: '#c62828',
+  backgroundColor: 'rgba(198,40,40,0.08)',
+},
+
+fitnessPlayerName: {
+  flex: 1,
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#111827',
+  marginRight: 10,
+},
+
+fitnessPlayerPick: {
+  fontSize: 12,
+  fontWeight: '800',
+  color: '#c62828',
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 999,
+  backgroundColor: 'rgba(198,40,40,0.12)',
+  overflow: 'hidden',
+},
+
+/* Coach assigned cards */
+fitnessAssignedCard: {
+  backgroundColor: '#fff',
+  borderRadius: 5,
+  padding: 10,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+  marginTop: 12,
+},
+
+fitnessAssignedHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+},
+
+
+
+fitnessBadgeText: {
+  fontSize: 12,
+  fontWeight: '900',
+  color: '#8b1a17',
+  letterSpacing: 0.6,
+},
+
+fitnessAssignedMeta: {
+  flex: 1,
+  fontSize: 13,
+  color: '#374151',
+  fontWeight: '700',
+},
+
+fitnessDivider: {
+  height: 1,
+  backgroundColor: '#eef2f7',
+  marginVertical: 12,
+},
+
+fitnessBulletRow: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  gap: 8,
+  marginBottom: 6,
+},
+
+fitnessBulletDot: {
+  fontSize: 16,
+  lineHeight: 20,
+  color: '#9ca3af',
+  marginTop: 1,
+},
+
+fitnessBulletText: {
+  flex: 1,
+  fontSize: 18,
+  color: '#9B1C1C',
+  lineHeight: 18,
+},
+
+/* Share row (premium toggle) */
+fitnessShareRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderRadius: 14,
+  padding: 12,
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+  backgroundColor: '#fff',
+  marginBottom: 12,
+},
+
+fitnessShareDot: {
+  width: 12,
+  height: 12,
+  borderRadius: 999,
+  backgroundColor: '#e5e7eb',
+  marginRight: 10,
+},
+
+fitnessShareDotOn: {
+  backgroundColor: '#22c55e',
+},
+
+fitnessShareTitle: {
+  fontSize: 14,
+  fontWeight: '900',
+  color: '#111827',
+},
+
+fitnessShareSub: {
+  fontSize: 12,
+  color: '#6b7280',
+  marginTop: 2,
+},
+
+fitnessShareAction: {
+  fontSize: 12,
+  fontWeight: '900',
+  color: '#111827',
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 999,
+  backgroundColor: '#f3f4f6',
+},
+
+fitnessInfoBox: {
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+  backgroundColor: '#f9fafb',
+  borderRadius: 14,
+  padding: 12,
+  marginBottom: 12,
+},
+
+fitnessInfoText: {
+  fontSize: 13,
+  color: '#6b7280',
+  lineHeight: 18,
+},
+
+/* Form cards */
+fitnessFormCard: {
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+  marginTop: 14,
+},
+
+fitnessFormHeaderRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 10,
+},
+
+fitnessFormTitle: {
+  fontSize: 18,
+  fontWeight: '700',
+  color: '#9B1C1C',
+},
+
+fitnessRemoveText: {
+  fontSize: 14,
+  fontWeight: '700',
+  color: '#9B1C1C',
+},
+
+fitnessTwoColRow: {
+  flexDirection: 'row',
+  gap: 12,
+  marginTop: 10,
+},
+
+fitnessCol: {
+  flex: 1,
+},
+
+fitnessNotesInput: {
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 12,
+  paddingHorizontal: 12,
+  paddingVertical: 12,
+  fontSize: 14,
+  color: '#111827',
+  height: 88,
+  textAlignVertical: 'top',
+},
+
+/* History */
+fitnessHistoryItem: {
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+  marginTop: 12,
+},
+
+fitnessHistoryTopRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 10,
+},
+
+fitnessHistoryDate: {
+  flex: 1,
+  fontSize: 15,
+  fontWeight: '700',
+  color: '#9B1C1C',
+},
+
+fitnessHistoryPill: {
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 999,
+  borderWidth: 1,
+},
+
+fitnessHistoryPillCoach: {
+  backgroundColor: 'rgba(225,6,0,0.08)',
+  borderColor: 'rgba(225,6,0,0.18)',
+},
+
+fitnessHistoryPillSelf: {
+  backgroundColor: 'rgba(17,24,39,0.06)',
+  borderColor: 'rgba(17,24,39,0.10)',
+},
+
+fitnessHistoryPillText: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: '#E10600',
+  letterSpacing: 0.6,
+},
+
+fitnessHistoryMeta: {
+  fontSize: 15,
+  color: '#000',
+  marginTop: 6,
+  lineHeight: 16,
+},
+/* ===========================
+   FITNESS HISTORY TOGGLE
+   =========================== */
+
+historyToggleBtn: {
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+  backgroundColor: '#fff',
+},
+
+historyToggleText: {
+  fontSize: 14,
+  fontWeight: '700',
+  color: '#9B1C1C',
+  letterSpacing: 0.2,
+},
+
+
+coachPremiumHeaderCard: {
+  backgroundColor: '#ffffff',
+  borderRadius: 18,
+  padding: 14,
+  marginBottom: 14,
+  shadowColor: '#000',
+  shadowOpacity: 0.08,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 3,
+},
+
+coachPremiumHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+
+coachPremiumHeaderTitle: {
+  fontSize: 24,
+  fontWeight: '800',
+  color: COACH_RED,
+},
+
+coachPremiumHeaderSub: {
+  marginTop: 4,
+  fontSize: 14,
+  color: '#6B7280',
+},
+
+coachPremiumHeaderLogo: {
+  width: 54,
+  height: 54,
+  borderRadius: 12,
+  resizeMode: 'cover',
+},
+
+/* ===========================
+   COACH FITNESS — PREMIUM
+   =========================== */
+coachFitnessHeroCard: {
+  backgroundColor: '#ffffff',
+  borderRadius: 18,
+  padding: 16,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+  shadowColor: '#000',
+  shadowOpacity: 0.06,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+coachFitnessHeroRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+coachFitnessHeroTitle: {
+  fontSize: 24,
+  fontWeight: '800',
+  color: COACH_RED,
+},
+coachFitnessHeroSub: {
+  marginTop: 6,
+  fontSize: 14,
+  lineHeight: 18,
+  color: '#6b7280',
+},
+coachFitnessHeroLogo: {
+  width: 56,
+  height: 56,
+  borderRadius: 12,
+  resizeMode: 'cover',
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+},
+coachFitnessStatsRow: {
+  flexDirection: 'row',
+  marginTop: 12,
+},
+coachFitnessStatPill: {
+  flex: 1,
+  borderRadius: 12,
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  backgroundColor: '#f9fafb',
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+},
+coachFitnessStatValue: {
+  fontSize: 19,
+  fontWeight: '800',
+  color: '#111827',
+},
+coachFitnessStatLabel: {
+  marginTop: 2,
+  fontSize: 12,
+  fontWeight: '700',
+  color: COACH_RED,
+  letterSpacing: 0.4,
+},
+coachFitnessSegWrap: {
+  flexDirection: 'row',
+  backgroundColor: COACH_RED,
+  borderRadius: 14,
+  padding: 4,
+  marginTop: 14,
+},
+coachFitnessSegBtn: {
+  flex: 1,
+  paddingVertical: 14,
+  borderRadius: 10,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+coachFitnessSegBtnActive: {
+  backgroundColor: '#ffffff',
+},
+coachFitnessSegText: {
+  fontWeight: '700',
+  color: '#ffffff',
+  fontSize: 15,
+},
+coachFitnessSegTextActive: {
+  color: COACH_RED,
+},
+coachFitnessSectionTitle: {
+  fontSize: 20,
+  fontWeight: '700',
+  color: COACH_RED,
+  marginTop: 20,
+  marginBottom: 8,
+},
+coachFitnessCard: {
+  backgroundColor: '#ffffff',
+  borderRadius: 16,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+  shadowOpacity: 0.06,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+coachFitnessCardHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 8,
+},
+coachFitnessCardTitle: {
+  fontSize: 18,
+  fontWeight: '800',
+  color: COACH_RED,
+},
+coachFitnessBadge: {
+  backgroundColor: 'rgba(198,40,40,0.12)',
+  borderRadius: 999,
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderWidth: 1,
+  borderColor: 'rgba(198,40,40,0.18)',
+},
+coachFitnessBadgeText: {
+  fontSize: 12,
+  fontWeight: '800',
+  color: COACH_RED,
+},
+coachFitnessBadgeSuccess: {
+  backgroundColor: 'rgba(16,185,129,0.12)',
+  borderColor: 'rgba(16,185,129,0.24)',
+},
+coachFitnessBadgeSuccessText: {
+  color: '#166534',
+},
+coachFitnessEmptyText: {
+  fontSize: 15,
+  lineHeight: 20,
+  color: '#6b7280',
+},
+coachFitnessListItem: {
+  marginTop: 12,
+  padding: 12,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+  backgroundColor: '#ffffff',
+},
+coachFitnessListHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+coachFitnessListTitle: {
+  flex: 1,
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#111827',
+  marginRight: 8,
+},
+coachFitnessListMeta: {
+  marginTop: 4,
+  fontSize: 13,
+  color: '#6b7280',
+},
+coachFitnessPill: {
+  alignSelf: 'flex-start',
+  borderRadius: 999,
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  backgroundColor: 'rgba(225,6,0,0.10)',
+  borderWidth: 1,
+  borderColor: 'rgba(225,6,0,0.18)',
+},
+coachFitnessPillText: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: COACH_RED,
+  letterSpacing: 0.4,
+},
+coachFitnessPillSuccess: {
+  backgroundColor: 'rgba(16,185,129,0.12)',
+  borderColor: 'rgba(16,185,129,0.25)',
+},
+coachFitnessPillSuccessText: {
+  color: '#166534',
+},
+coachFitnessBulletRow: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  marginTop: 6,
+},
+coachFitnessBulletDot: {
+  fontSize: 14,
+  color: '#9ca3af',
+  marginRight: 8,
+  marginTop: 1,
+},
+coachFitnessBulletText: {
+  flex: 1,
+  fontSize: 14,
+  color: '#374151',
+  lineHeight: 18,
+},
+coachFitnessDrillBlock: {
+  marginTop: 12,
+  padding: 12,
+  borderRadius: 12,
+  backgroundColor: '#f9fafb',
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+},
+coachFitnessDrillHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+coachFitnessRemoveText: {
+  fontSize: 13,
+  fontWeight: '700',
+  color: '#c62828',
+},
+coachFitnessActionBtn: {
+  marginTop: 10,
+},
+
+/* ===========================
+   COACH AVAILABILITY — PREMIUM
+   =========================== */
+coachAvailabilityHeroCard: {
+  backgroundColor: '#ffffff',
+  borderRadius: 18,
+  padding: 16,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+  shadowColor: '#000',
+  shadowOpacity: 0.06,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+coachAvailabilityHeroRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+coachAvailabilityHeroTitle: {
+  fontSize: 24,
+  fontWeight: '800',
+  color: COACH_RED,
+},
+coachAvailabilityHeroSub: {
+  marginTop: 6,
+  fontSize: 14,
+  lineHeight: 18,
+  color: '#6b7280',
+},
+coachAvailabilityStatsRow: {
+  flexDirection: 'row',
+  marginTop: 12,
+},
+coachAvailabilityStatPill: {
+  flex: 1,
+  borderRadius: 12,
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  backgroundColor: '#f9fafb',
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+},
+coachAvailabilityStatValue: {
+  fontSize: 19,
+  fontWeight: '800',
+  color: '#111827',
+},
+coachAvailabilityStatLabel: {
+  marginTop: 2,
+  fontSize: 12,
+  fontWeight: '700',
+  color: COACH_RED,
+  letterSpacing: 0.4,
+},
+coachAvailabilitySectionTitle: {
+  fontSize: 20,
+  fontWeight: '700',
+  color: COACH_RED,
+  marginTop: 20,
+  marginBottom: 8,
+},
+coachAvailabilityCard: {
+  backgroundColor: '#ffffff',
+  borderRadius: 16,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+  shadowOpacity: 0.06,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+coachAvailabilityCardHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 8,
+},
+coachAvailabilityCardTitle: {
+  fontSize: 18,
+  fontWeight: '800',
+  color: COACH_RED,
+},
+coachAvailabilityBadge: {
+  backgroundColor: 'rgba(198,40,40,0.12)',
+  borderRadius: 999,
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderWidth: 1,
+  borderColor: 'rgba(198,40,40,0.18)',
+},
+coachAvailabilityBadgeText: {
+  fontSize: 12,
+  fontWeight: '800',
+  color: COACH_RED,
+},
+coachAvailabilityBadgeBooked: {
+  backgroundColor: 'rgba(17,24,39,0.08)',
+  borderColor: 'rgba(17,24,39,0.14)',
+},
+coachAvailabilityBadgeBookedText: {
+  color: '#374151',
+},
+coachAvailabilityInfoText: {
+  marginTop: 8,
+  fontSize: 14,
+  lineHeight: 18,
+  color: '#6b7280',
+},
+coachAvailabilityDateBtn: {
+  marginTop: 6,
+},
+coachAvailabilityEmptyText: {
+  fontSize: 15,
+  lineHeight: 20,
+  color: '#6b7280',
+},
+coachAvailabilitySlotItem: {
+  marginTop: 12,
+  padding: 12,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+  backgroundColor: '#ffffff',
+},
+coachAvailabilitySlotItemBooked: {
+  backgroundColor: '#f9fafb',
+},
+coachAvailabilitySlotHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+coachAvailabilitySlotTime: {
+  flex: 1,
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#111827',
+  marginRight: 8,
+},
+coachAvailabilitySlotBadge: {
+  alignSelf: 'flex-start',
+  borderRadius: 999,
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  backgroundColor: 'rgba(225,6,0,0.10)',
+  borderWidth: 1,
+  borderColor: 'rgba(225,6,0,0.18)',
+},
+coachAvailabilitySlotBadgeText: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: COACH_RED,
+  letterSpacing: 0.4,
+},
+coachAvailabilitySlotBadgeBooked: {
+  backgroundColor: 'rgba(17,24,39,0.08)',
+  borderColor: 'rgba(17,24,39,0.14)',
+},
+coachAvailabilitySlotBadgeBookedText: {
+  color: '#374151',
+},
+
+/* ===========================
+   COACH BOOKING REQUESTS — PREMIUM
+   =========================== */
+coachBookingHeroCard: {
+  backgroundColor: '#ffffff',
+  borderRadius: 18,
+  padding: 16,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+  shadowColor: '#000',
+  shadowOpacity: 0.06,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+coachBookingHeroRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+coachBookingHeroTitle: {
+  fontSize: 24,
+  fontWeight: '800',
+  color: COACH_RED,
+},
+coachBookingHeroSub: {
+  marginTop: 6,
+  fontSize: 14,
+  lineHeight: 18,
+  color: '#6b7280',
+},
+coachBookingStatsRow: {
+  flexDirection: 'row',
+  marginTop: 12,
+},
+coachBookingStatPill: {
+  flex: 1,
+  borderRadius: 12,
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  backgroundColor: '#f9fafb',
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+},
+coachBookingStatValue: {
+  fontSize: 19,
+  fontWeight: '800',
+  color: '#111827',
+},
+coachBookingStatLabel: {
+  marginTop: 2,
+  fontSize: 12,
+  fontWeight: '700',
+  color: COACH_RED,
+  letterSpacing: 0.4,
+},
+coachBookingSectionTitle: {
+  fontSize: 20,
+  fontWeight: '700',
+  color: COACH_RED,
+  marginTop: 20,
+  marginBottom: 8,
+},
+coachBookingCard: {
+  backgroundColor: '#ffffff',
+  borderRadius: 16,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: '#f1f5f9',
+  shadowOpacity: 0.06,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+coachBookingEmptyText: {
+  fontSize: 15,
+  lineHeight: 20,
+  color: '#6b7280',
+},
+coachBookingRequestItem: {
+  marginTop: 12,
+  padding: 12,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#eef2f7',
+  backgroundColor: '#ffffff',
+},
+coachBookingRequestHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+coachBookingRequestTitle: {
+  flex: 1,
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#111827',
+  marginRight: 8,
+},
+coachBookingRequestMeta: {
+  marginTop: 4,
+  fontSize: 13,
+  color: '#6b7280',
+},
+coachBookingBadge: {
+  alignSelf: 'flex-start',
+  borderRadius: 999,
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  backgroundColor: 'rgba(225,6,0,0.10)',
+  borderWidth: 1,
+  borderColor: 'rgba(225,6,0,0.18)',
+},
+coachBookingBadgeText: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: COACH_RED,
+  letterSpacing: 0.4,
+},
+/////////////////////////
+
+ 
 modalBody: {
   borderRadius: 10,
   borderWidth: 1,
@@ -64,10 +2067,7 @@ modalPrimaryBtnText: {
   color: '#fff',
 },
 
-  formScroll: {
-   paddingBottom: 60,
-  paddingHorizontal: 6,
-  },
+  
 
   playerStatsCard: {
   backgroundColor: '#FFFFFF',
@@ -81,12 +2081,6 @@ modalPrimaryBtnText: {
   elevation: 3,
   borderWidth: 1,
   borderColor: 'rgba(17, 24, 39, 0.06)',
-},
-
-statsValue: {
-  fontSize: 16,
-  fontWeight: '800',
-  color: '#111827',
 },
 
 
@@ -122,65 +2116,6 @@ statsValue: {
     marginBottom: 80,
   },
 
-  videoItemCard: {
-    borderRadius: 14,
-    padding: 10,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    marginBottom: 14,
-  },
-  videoItemTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  videoItemMeta: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginBottom: 6,
-  },
-  videoPlayer: {
-    width: '100%',
-    height: 200,
-    borderRadius: 10,
-    marginTop: 4,
-    backgroundColor: '#000',
-  },
-
-
-  primaryButton: {
-  backgroundColor: '#E10600',
-  paddingVertical: 14,
-  borderRadius: 10,
-  alignItems: 'center',
-  width: '85%',         // <— narrower than screen
-  alignSelf: 'center',  // <— center horizontally
-},
-  primaryButtonText: {
-   color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  secondaryButton: {
-  marginTop: 12,
-  paddingVertical: 14,
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: '#E10600',
-  alignItems: 'center',
-  width: '85%',
-  alignSelf: 'center',
-},
-  secondaryButtonText: {
-    color: '#111827',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-
   // Texts
   screenTitle: {
     fontSize: 24,
@@ -194,82 +2129,19 @@ statsValue: {
     marginTop: 8,
   },
   label: {
-    fontSize: 18,
-    color: '#374151',
+    fontSize: 20,
+    color: '#9B1C1C',
     marginTop: 12,
     marginBottom: 4,
+    fontWeight:"400",
   },
 
-  // Inputs
-  input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#111827',
-    backgroundColor: '#ffffff',
-  },
-
-  // Role chips
-  roleRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-     marginBottom: 24, 
-  },
-  roleChip: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    alignItems: 'center',
-  },
-  roleChipSelected: {
-    backgroundColor: '#E10600',
-    borderColor: '#E10600',
-  },
-  roleChipText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  roleChipTextSelected: {
-     color: '#ffffff',
-  fontWeight: '600',
-  },
-
-  // Checkbox
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  checkboxBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#9ca3af',
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  
   checkboxBoxChecked: {
     backgroundColor: '#E10600',
     borderColor: '#E10600',
   },
-  checkboxTick: {
-    color: '#022c22',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  checkboxLabel: {
-    fontSize: 14,
-    color: '#374151',
-  },
+  
 
   // Dropdown
   dropdownSelected: {
@@ -313,7 +2185,7 @@ statsValue: {
   playerWelcomeSubText: {
   marginTop: 20,
   marginBottom: 24,
-  fontSize: 20,
+  fontSize: 18,
   lineHeight: 22,
   color: '#374151',
 },
@@ -324,77 +2196,13 @@ statsValue: {
   marginTop: 10,
   marginBottom: 16,
 },
-sectionTitle: {
-  fontSize: 20,
-  fontWeight: '800',
-  marginTop: 10,
-  marginBottom: 10,
-  color: '#111', // ✅ visible
-},
 
-card: {
-  backgroundColor: '#fff', // ✅ force white background
-  borderRadius: 18,
-  padding: 16,
-  borderWidth: 1,
-  borderColor: '#eee',
-  shadowColor: '#000',
-  shadowOpacity: 0.04,
-  shadowRadius: 14,
-  shadowOffset: { width: 0, height: 6 },
-  marginBottom: 14,
-},
 
 cardTitle: { fontSize: 16, fontWeight: '800', marginBottom: 6, color: '#111' },
 cardBody: { fontSize: 14, color: '#222', marginBottom: 4 },
 cardMeta: { fontSize: 12, color: '#666', marginTop: 6 },
 emptyCardText: { color: '#999', fontSize: 14 },
 
-statsHeaderRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-},
-
-statsCardTitle: { fontSize: 16, fontWeight: '800', color: '#111' },
-statsCardSubtitle: { color: '#666', marginTop: 6, lineHeight: 18 },
-
-editLink: { color: '#b10f0f', fontWeight: '800' },
-
-statsTable: {
-  marginTop: 14,
-  backgroundColor: '#fff',
-  borderRadius: 14,
-  borderWidth: 1,
-  borderColor: '#eee',
-  overflow: 'hidden',
-},
-
-statsRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  paddingVertical: 10,
-  paddingHorizontal: 14,
-  borderBottomWidth: 1,
-  borderBottomColor: '#eee',
-},
-
-statsRowLast: {
-  borderBottomWidth: 0,
-},
-
-statsLabel: { color: '#666', fontWeight: '600' },
-
-statsButton: {
-  marginTop: 14,
-  backgroundColor: '#f2f2f2',
-  borderRadius: 14,
-  paddingVertical: 12,
-  paddingHorizontal: 14,
-  alignSelf: 'flex-start',
-},
-
-statsButtonText: { fontWeight: '800', color: '#111' },
 
 roleTogglePill: {
   flex: 1,
@@ -403,12 +2211,12 @@ roleTogglePill: {
   alignItems: 'center',
   justifyContent: 'center',
   borderWidth: 1,
-  borderColor: '#D7D7D7',
+  borderColor: '#E10600',
   backgroundColor: '#FFFFFF',
 },
 
 roleTogglePillActive: {
-  backgroundColor: '#C41C12', // Topline red
+  backgroundColor: '#E10600', // Topline red
   borderColor: '#C41C12',
 },
 sessionInfoBlock: {
@@ -429,7 +2237,7 @@ sessionMetaText: {
 },
 
 roleToggleText: {
-  fontSize: 16,
+  fontSize: 18,
   fontWeight: '700',
   color: '#222222',
 },
@@ -438,8 +2246,9 @@ roleToggleTextActive: {
   color: '#FFFFFF',
 },
   cardSubtitle: {
-    fontSize: 14,
-    color: '#f9fafb',
+    fontSize: 20,
+    fontWeight: '700',
+    color: COACH_RED,
     marginBottom: 6,
   },
   cardBodyText: {
@@ -467,19 +2276,18 @@ roleToggleTextActive: {
     marginBottom: 4,
   },
   playerCardSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: 20,
+    fontWeight: '700',
+    color: COACH_RED,
     marginBottom: 6,
+    marginTop:20
   },
   playerCardBodyText: {
     fontSize: 14,
     color: '#374151',
     marginBottom: 2,
   },
-  playerCardEmptyText: {
-    fontSize: 14,
-    color: '#9ca3af',
-  },
+  
 
   quickActionRow: {
     flexDirection: 'row',
@@ -654,11 +2462,7 @@ playerTypeCell: {
     marginRight: 6,
     marginBottom: 6,
   },
-  fitnessBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#b91c1c',
-  },
+  
   fitnessTableHeaderRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -794,42 +2598,7 @@ rolePillTextActive: {
    =========================== */
 
 /* Main heading (H1) */
-h1: {
-  fontSize: 24,
-  fontWeight: '700',
-  color: '#111111',
-  textAlign: 'center',
-  marginBottom: 20,
-},
 
-/* Text-only button (e.g. Sign up / Sign in links) */
-linkButton: {
-  alignSelf: 'center',
-  marginTop: 16,
-  paddingVertical: 6,
-},
-textInput: {
-  backgroundColor: '#FFFFFF',
-  borderWidth: 1,
-  borderColor: '#E5E7EB',   // same neutral border used elsewhere
-  borderRadius: 8,
-  paddingHorizontal: 12,
-  paddingVertical: 10,
-  fontSize: 14,
-  color: '#111827',
-},
-/* Link button text */
-linkButtonText: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#E10600', // Topline red
-},
-fieldLabel: {
-  fontSize: 14,
-  fontWeight: '600',
-  marginTop: 14,
-  marginBottom: 6,
-},
 /* Small logo wrapper (signin/signup top) */
 
 /* Brand title text (fallback if logo image not used) */
@@ -1021,22 +2790,22 @@ coachVideoTitle: {
   color: '#111827',
 },
 coachVideoMeta: {
-  fontSize: 12,
+  fontSize: 13,
   color: '#4b5563',
   marginTop: 2,
 },
 coachVideoCTA: {
   marginTop: 10,
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: '600',
-  color: '#b91c1c',
+  color: COACH_RED,
 },
 
 coachStatusPill: {
   paddingHorizontal: 10,
   paddingVertical: 6,
   borderRadius: 999,
-  marginLeft: 10,
+  marginLeft:120,
 },
 coachStatusPillPending: {
   backgroundColor: '#fee2e2',
@@ -1045,11 +2814,11 @@ coachStatusPillDone: {
   backgroundColor: '#dcfce7',
 },
 coachStatusText: {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: '700',
 },
 coachStatusTextPending: {
-  color: '#b91c1c',
+  color: COACH_RED,
 },
 coachStatusTextDone: {
   color: '#166534',
@@ -1117,14 +2886,7 @@ consentText: {
   marginBottom: 10,
   lineHeight: 18,
 },
-pickerCard: {
-  backgroundColor: '#ffffff',
-  borderRadius: 12,
-  borderWidth: 1,
-  borderColor: '#e5e7eb',
-  overflow: 'hidden',
-  marginBottom: 12,
-},
+
 dashHeaderCard: {
   backgroundColor: '#D40000', // TC red
   borderRadius: 18,
@@ -1214,23 +2976,7 @@ heroContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  avatarCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
+
   
   greeting: {
     color: 'rgba(255,255,255,0.90)',
@@ -1256,38 +3002,12 @@ heroContainer: {
     lineHeight: 20,
     fontWeight: '500',
   },
-videoUploadCard: {
-  marginTop: 14,
-  backgroundColor: '#E10600',
-  borderRadius: 18,
-  paddingVertical: 26,
-  paddingHorizontal: 18,
-  alignItems: 'center',
-  justifyContent: 'center',
-},
 
-videoUploadHint: {
-  color: '#FFFFFF',
-  fontSize: 16,
-  fontWeight: '700',
-},
-
-videoUploadMeta: {
-  marginTop: 10,
-  color: 'rgba(255,255,255,0.85)',
-  fontSize: 13,
-},
 
 dropdownHelperText: {
   marginTop: 8,
   color: '#6B7280',
   fontSize: 12,
-},
-assignLabel: {
-  marginTop: 12,
-  fontSize: 14,
-  fontWeight: '700',
-  color: '#111827',
 },
 
 pickerCardSelected: {
@@ -1295,37 +3015,6 @@ pickerCardSelected: {
   borderWidth: 2,
 },
 
-
-confirmButton: {
-  marginTop: 12,
-  backgroundColor: '#E10600',
-  borderRadius: 12,
-  paddingVertical: 14,
-  alignItems: 'center',
-},
-
-confirmButtonText: {
-  color: '#FFFFFF',
-  fontWeight: '800',
-  fontSize: 15,
-},
-
-sharedPill: {
-  marginTop: 12,
-  alignSelf: 'flex-start',
-  backgroundColor: 'rgba(16,185,129,0.15)', // light green tint
-  borderRadius: 999,
-  paddingVertical: 8,
-  paddingHorizontal: 12,
-  borderWidth: 1,
-  borderColor: 'rgba(16,185,129,0.35)',
-},
-
-sharedPillText: {
-  color: '#065F46',
-  fontWeight: '800',
-  fontSize: 12,
-},
 loginBackButton: {
   position: 'absolute',
   top: 12,
@@ -1352,23 +3041,7 @@ selectedCoachText: {
   fontWeight: '700',
   color: '#E10600', // ✅ red highlight text
 },
-selectedRow: {
-  marginTop: 8,
-  fontSize: 13,
-},
 
-selectedLabel: {
-  color: '#111827',
-  fontWeight: '700',
-},
-
-sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 6,
-    marginBottom: 8,
-  },
   
   badge: {
     paddingHorizontal: 10,
@@ -1409,20 +3082,6 @@ sectionHeaderRow: {
     flex: 1,
   },
 
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-
-  bigTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111',
-  },
-  
-
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1453,18 +3112,6 @@ sectionHeaderRow: {
     fontWeight: '800',
   },
 
-  divider: {
-    height: 1,
-    backgroundColor: '#EFEFEF',
-    marginVertical: 12,
-  },
-
-  feedbackText: {
-    fontSize: 14,
-    color: '#111',
-    lineHeight: 20,
-    fontWeight: '600',
-  },
 
   subMeta: {
     marginTop: 10,
@@ -1476,18 +3123,7 @@ sectionHeaderRow: {
   emptyStateWrap: {
     paddingVertical: 8,
   },
-  emptyTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#111',
-    marginBottom: 6,
-  },
-  emptyBody: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 18,
-    fontWeight: '600',
-  },
+  
   loading: {
     fontSize: 13,
     color: '#6B7280',
@@ -1558,87 +3194,6 @@ playerHeroName: {
 playerHeroTagline: {
   marginTop: 4,           // ✅ less spacing
   lineHeight: 18,
-},
-screen: { flex: 1, backgroundColor: '#fff' },
-  container: { padding: 16, paddingBottom: 26 },
-
-  headerCard: {
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 18,
-    backgroundColor: '#b10f0f',
-  },
-  
-
-
-  headerTextBlock: { flex: 1, paddingRight: 10 },
-  headerHi: { color: '#fff', fontSize: 14, opacity: 0.9 },
-  headerName: { color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 2 },
-  headerRole: { color: '#fff', fontSize: 14, marginTop: 4, opacity: 0.9 },
-  headerWelcome: { color: '#fff', marginTop: 10, opacity: 0.9, lineHeight: 18 },
-
-  headerLogo: { width: 44, height: 44, borderRadius: 10, resizeMode: 'contain' },
-
-
-  quickActionsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#eee',
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 14,
-  },
-  quickActionTile: {
-    flex: 1,
-    backgroundColor: '#fafafa',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  quickActionEmoji: { fontSize: 20, marginBottom: 6 },
-  quickActionText: { fontWeight: '700', color: '#111' },
-
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    padding: 18,
-  },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  modalTitle: { fontSize: 18, fontWeight: '800', marginBottom: 12 },
-  modalRow: { flexDirection: 'row', gap: 12, marginBottom: 10 },
-  modalField: { flex: 1 },
-  modalLabel: { fontSize: 12, color: '#666', marginBottom: 6 },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: '#fff',
-  },
-  modalButtonsRow: { flexDirection: 'row', gap: 12, marginTop: 10 },
-  modalBtn: { flex: 1, borderRadius: 14, paddingVertical: 12, alignItems: 'center' },
-  modalBtnSecondary: { backgroundColor: '#f2f2f2' },
-  modalBtnPrimary: { backgroundColor: '#b10f0f' },
-  modalBtnSecondaryText: { fontWeight: '800', color: '#111' },
-  modalBtnPrimaryText: { fontWeight: '800', color: '#fff' },
-
-headerRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
 },
 
 leftRow: {
@@ -1751,12 +3306,6 @@ metaPill: {
     color: '#111827',
   },
 
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 6,
-  },
 safeArea:{
 flex: 1,
 backgroundColor: '#fff',
@@ -1798,13 +3347,6 @@ shimmerBlock: {
   overflow: 'hidden',
 },
 
-shimmerOverlay: {
-  position: 'absolute',
-  top: 0,
-  bottom: 0,
-  width: 140,
-},
-
 shimmerGradient: {
   flex: 1,
 },
@@ -1814,11 +3356,7 @@ pillRow: {
   gap: 10,
   marginTop: 12
 },
-pillText: {
-color:'#7A0A0C',
-fontWeight: '800',
-fontSize: 12,
-},
+
 recentPillRow: {
   flexDirection: 'row',
   alignItems: 'center',
@@ -1826,39 +3364,9 @@ recentPillRow: {
   gap: 12,
 },
 
-sectionBlock:{
-marginTop: 10,
-},
+
 
 // ✅ New: reusable “Topline bordered section card”
-  toplineSectionCard :{
-    borderWidth: 1.5,
-    borderColor: '#B31217',
-    borderRadius: 16,
-    backgroundColor: '#fff',
-    padding: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
-  },
-
- pill :{
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: 'rgba(179,18,23,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(179,18,23,0.25)',
-  },
-
-  shimmerBox :{
-    height: 84,
-    borderRadius: 14,
-    backgroundColor: '#F3F4F6',
-    overflow: 'hidden',
-  },
 backBtn: {
     paddingVertical: 8,
     paddingHorizontal: 10,
@@ -2177,16 +3685,6 @@ title: {
  
   subtitle: { fontSize: 15, color: "#666", marginTop: 6 },
 
-  backButton: {
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: "#b71c1c",
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  backButtonText: { color: "#111", fontWeight: "700" },
-
   tabRow: { flexDirection: "row", gap: 10, marginTop: 14 },
   tabPill: {
     flex: 1,
@@ -2356,13 +3854,13 @@ videoCardHeader: {
 },
 
 videoCardName: {
-  fontSize: 17,
-  fontWeight: "800",
+  fontSize: 16,
+  fontWeight: "700",
   color: "#111827",
 },
 
 videoCardMeta: {
-  fontSize: 13,
+  fontSize: 14,
   color: "#6B7280",
   marginTop: 2,
 },
