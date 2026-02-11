@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, View, TouchableOpacity } from 'react-native';
+import { SafeAreaView, ScrollView, Text, View, TouchableOpacity, Image } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 
@@ -7,6 +7,8 @@ import { styles } from '../styles/styles';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { safeToDate, formatDayDateTime } from '../utils/dateFormatter';
+
+const TOPLINE_LOGO = require('../../assets/topline-cricket-image.jpg');
 
 export default function PlayerCoachingVideosScreenBody({ navigation }: any) {
   const { firebaseUser } = useAuth();
@@ -59,46 +61,60 @@ export default function PlayerCoachingVideosScreenBody({ navigation }: any) {
   return (
     <SafeAreaView style={styles.screenContainer}>
       <ScrollView contentContainerStyle={styles.formScroll}>
-        <Text style={styles.sectionTitle}>Coaching Videos</Text>
+        <View style={styles.topRightLogoContainer}>
+          <Image source={TOPLINE_LOGO} style={styles.topRightLogo} />
+        </View>
 
-        {loading ? (
-          <Text style={styles.playerWelcomeSubText}>Loading…</Text>
-        ) : coachVideos.length === 0 ? (
-          <Text style={styles.playerCardEmptyText}>No coaching videos shared yet.</Text>
-        ) : (
-          <View style={{ marginTop: 10 }}>
-            {coachVideos.map((v) => {
-              const dt =
-                safeToDate(v?.createdAt) ||
-                safeToDate(v?.createdAtMs) ||
-                (v?.createdAtLabel ? safeToDate(String(v.createdAtLabel)) : null);
-
-              const dateLabel = dt ? formatDayDateTime(dt) : '';
-
-              return (
-                <View key={v.id} style={styles.videoItemCard}>
-                  <Text style={styles.videoItemTitle}>
-                    {v.coachName || 'Coach'}
-                    {dateLabel ? `  •  ${dateLabel}` : ''}
-                  </Text>
-
-                  <Video
-                    source={{ uri: v.videoUrl }}
-                    style={styles.videoPlayer}
-                    useNativeControls
-                    resizeMode={ResizeMode.CONTAIN}
-                  />
-
-                  {v.notes ? (
-                    <Text style={styles.playerWelcomeSubText}>{v.notes}</Text>
-                  ) : (
-                    <Text style={styles.playerWelcomeSubText}>No notes added.</Text>
-                  )}
-                </View>
-              );
-            })}
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>📺</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Coaching Videos</Text>
+            </View>
           </View>
-        )}
+          <View style={styles.dashboardSectionDivider} />
+
+          {loading ? (
+            <Text style={styles.playerWelcomeSubText}>Loading…</Text>
+          ) : coachVideos.length === 0 ? (
+            <Text style={styles.playerCardEmptyText}>No coaching videos shared yet.</Text>
+          ) : (
+            <View style={{ marginTop: 10 }}>
+              {coachVideos.map((v) => {
+                const dt =
+                  safeToDate(v?.createdAt) ||
+                  safeToDate(v?.createdAtMs) ||
+                  (v?.createdAtLabel ? safeToDate(String(v.createdAtLabel)) : null);
+
+                const dateLabel = dt ? formatDayDateTime(dt) : '';
+
+                return (
+                  <View key={v.id} style={styles.videoItemCard}>
+                    <Text style={styles.videoItemTitle}>
+                      {v.coachName || 'Coach'}
+                      {dateLabel ? `  •  ${dateLabel}` : ''}
+                    </Text>
+
+                    <Video
+                      source={{ uri: v.videoUrl }}
+                      style={styles.videoPlayer}
+                      useNativeControls
+                      resizeMode={ResizeMode.CONTAIN}
+                    />
+
+                    {v.notes ? (
+                      <Text style={styles.playerWelcomeSubText}>{v.notes}</Text>
+                    ) : (
+                      <Text style={styles.playerWelcomeSubText}>No notes added.</Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
 
         <TouchableOpacity
           style={[styles.secondaryButton, { marginTop: 20, marginBottom: 30 }]}

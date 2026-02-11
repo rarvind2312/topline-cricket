@@ -213,104 +213,141 @@ export default function CoachAvailabilityScreenBody({ navigation }: Props) {
           </View>
         </View>
 
-        <Text style={styles.coachAvailabilitySectionTitle}>Select Date</Text>
-        <View style={styles.coachAvailabilityCard}>
-          <View style={styles.coachAvailabilityCardHeaderRow}>
-            
-            
-          </View>
-
-          <TouchableOpacity
-            style={[styles.secondaryButton, styles.coachAvailabilityDateBtn]}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.secondaryButtonText}>📅 {formatDayDate(date)}</Text>
-          </TouchableOpacity>
-
-          {showDatePicker ? (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display="default"
-              onChange={(event: DateTimePickerEvent, selected?: Date) => {
-                setShowDatePicker(false);
-                if (selected) setDate(selected);
-              }}
-            />
-          ) : null}
-
-          <Text style={styles.coachAvailabilityInfoText}>
-            {isWeekend(date) ? 'Weekend: 9:00 AM – 1:00 PM' : 'Weekday: 9:00 AM – 6:00 PM'}
-          </Text>
-        </View>
-
-        <Text style={styles.coachAvailabilitySectionTitle}>Create Slot</Text>
-        <View style={styles.coachAvailabilityCard}>
-          <View style={styles.coachAvailabilityCardHeaderRow}>
-
-          </View>
-
-          <Text style={styles.inputLabel}>Start time</Text>
-          <View style={styles.pickerCard}>
-            <Picker selectedValue={selectedStart} onValueChange={v => setSelectedStart(String(v))}>
-              {startTimes.map(t => (
-                <Picker.Item key={t} label={t} value={t} />
-              ))}
-            </Picker>
-          </View>
-
-          <Text style={[styles.inputLabel, { marginTop: 12 }]}>Duration</Text>
-          <View style={styles.pickerCard}>
-            <Picker selectedValue={duration} onValueChange={v => setDuration(Number(v))}>
-              <Picker.Item label="30 mins" value={30} />
-              <Picker.Item label="60 mins" value={60} />
-              <Picker.Item label="90 mins" value={90} />
-              <Picker.Item label="120 mins" value={120} />
-            </Picker>
-          </View>
-
-          <TouchableOpacity style={[styles.secondaryButton, { marginTop: 12 }]} onPress={addSlot}>
-            <Text style={styles.secondaryButtonText}>+ Add Slot</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.coachAvailabilitySectionTitle}>Available Slots</Text>
-        <View style={styles.coachAvailabilityCard}>
-          <View style={styles.coachAvailabilityCardHeaderRow}>
-            <Text style={styles.coachAvailabilityCardTitle}>Slots</Text>
-            <View style={styles.coachAvailabilityBadge}>
-              <Text style={styles.coachAvailabilityBadgeText}>{visibleSlots.length} available</Text>
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>📅</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Select Date</Text>
             </View>
           </View>
+          <View style={styles.dashboardSectionDivider} />
 
-          {visibleSlots.length === 0 ? (
-            <Text style={styles.coachAvailabilityEmptyText}>No available slots for this date.</Text>
-          ) : (
-            visibleSlots.map((s, i) => (
-              <View key={`${s.start}-${s.end}-${i}`} style={styles.coachAvailabilitySlotItem}>
-                <View style={styles.coachAvailabilitySlotHeaderRow}>
-                  <Text style={styles.coachAvailabilitySlotTime}>
-                    {s.start} – {s.end}
-                  </Text>
-                  <View style={styles.coachAvailabilitySlotBadge}>
-                    <Text style={styles.coachAvailabilitySlotBadgeText}>Available</Text>
-                  </View>
-                </View>
+          <View style={styles.coachAvailabilityCard}>
+            <View style={styles.coachAvailabilityCardHeaderRow} />
 
-                <TouchableOpacity
-                  style={[styles.secondaryButton, { marginTop: 10 }]}
-                  onPress={() => removeSlotByTime(s.start, s.end)}
-                >
-                  <Text style={styles.secondaryButtonText}>Remove Slot</Text>
-                </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryButton, styles.coachAvailabilityDateBtn]}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.secondaryButtonText}>📅 {formatDayDate(date)}</Text>
+            </TouchableOpacity>
+
+            {showDatePicker ? (
+              <DateTimePicker
+                value={date}
+                mode="date"
+                display="default"
+                onChange={(event: DateTimePickerEvent, selected?: Date) => {
+                  setShowDatePicker(false);
+                  if (selected) setDate(selected);
+                }}
+              />
+            ) : null}
+
+            <Text style={styles.coachAvailabilityInfoText}>
+              {isWeekend(date) ? 'Weekend: 9:00 AM – 1:00 PM' : 'Weekday: 9:00 AM – 6:00 PM'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>⏱️</Text>
               </View>
-            ))
-          )}
+              <Text style={styles.dashboardSectionTitle}>Create Slot</Text>
+            </View>
+          </View>
+          <View style={styles.dashboardSectionDivider} />
+
+          <View style={styles.coachAvailabilityCard}>
+            <View style={styles.coachAvailabilityCardHeaderRow} />
+
+            <Text style={styles.inputLabel}>Start time</Text>
+            <View style={styles.pickerCard}>
+              <Picker selectedValue={selectedStart} onValueChange={v => setSelectedStart(String(v))}>
+                {startTimes.map(t => (
+                  <Picker.Item key={t} label={t} value={t} />
+                ))}
+              </Picker>
+            </View>
+
+            <Text style={[styles.inputLabel, { marginTop: 12 }]}>Duration</Text>
+            <View style={styles.pickerCard}>
+              <Picker selectedValue={duration} onValueChange={v => setDuration(Number(v))}>
+                <Picker.Item label="30 mins" value={30} />
+                <Picker.Item label="60 mins" value={60} />
+                <Picker.Item label="90 mins" value={90} />
+                <Picker.Item label="120 mins" value={120} />
+              </Picker>
+            </View>
+
+            <TouchableOpacity style={[styles.secondaryButton, { marginTop: 12 }]} onPress={addSlot}>
+              <Text style={styles.secondaryButtonText}>+ Add Slot</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>✅</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Available Slots</Text>
+            </View>
+          </View>
+          <View style={styles.dashboardSectionDivider} />
+
+          <View style={styles.coachAvailabilityCard}>
+            <View style={styles.coachAvailabilityCardHeaderRow}>
+              <Text style={styles.coachAvailabilityCardTitle}>Slots</Text>
+              <View style={styles.coachAvailabilityBadge}>
+                <Text style={styles.coachAvailabilityBadgeText}>{visibleSlots.length} available</Text>
+              </View>
+            </View>
+
+            {visibleSlots.length === 0 ? (
+              <Text style={styles.coachAvailabilityEmptyText}>No available slots for this date.</Text>
+            ) : (
+              visibleSlots.map((s, i) => (
+                <View key={`${s.start}-${s.end}-${i}`} style={styles.coachAvailabilitySlotItem}>
+                  <View style={styles.coachAvailabilitySlotHeaderRow}>
+                    <Text style={styles.coachAvailabilitySlotTime}>
+                      {s.start} – {s.end}
+                    </Text>
+                    <View style={styles.coachAvailabilitySlotBadge}>
+                      <Text style={styles.coachAvailabilitySlotBadgeText}>Available</Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.secondaryButton, { marginTop: 10 }]}
+                    onPress={() => removeSlotByTime(s.start, s.end)}
+                  >
+                    <Text style={styles.secondaryButtonText}>Remove Slot</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </View>
         </View>
 
         {bookedSlots.length > 0 ? (
-          <>
-            <Text style={styles.coachAvailabilitySectionTitle}>Booked</Text>
+          <View style={styles.dashboardSectionWrap}>
+            <View style={styles.dashboardSectionHeader}>
+              <View style={styles.dashboardSectionHeaderLeft}>
+                <View style={styles.dashboardSectionIconWrap}>
+                  <Text style={styles.dashboardSectionIcon}>📌</Text>
+                </View>
+                <Text style={styles.dashboardSectionTitle}>Booked</Text>
+              </View>
+            </View>
+            <View style={styles.dashboardSectionDivider} />
+
             <View style={styles.coachAvailabilityCard}>
               <View style={styles.coachAvailabilityCardHeaderRow}>
                 <Text style={styles.coachAvailabilityCardTitle}>Booked Slots</Text>
@@ -335,7 +372,7 @@ export default function CoachAvailabilityScreenBody({ navigation }: Props) {
                 </View>
               ))}
             </View>
-          </>
+          </View>
         ) : null}
 
         <TouchableOpacity style={[styles.primaryButton, { marginTop: 14 }]} onPress={saveAvailability}>

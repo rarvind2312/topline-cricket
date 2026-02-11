@@ -1,6 +1,6 @@
 import { StyleSheet, Platform } from 'react-native';
 
-const COACH_RED = '#870909';
+const COACH_RED = '#bb2b2b';
 
 export const styles = StyleSheet.create({
 // ---------- AUTH LANDING (PREMIUM, CROSS-PLATFORM) ----------
@@ -540,6 +540,68 @@ sectionHeaderRow: {
   marginTop: 10,
 },
 
+// Player Dashboard section shells
+dashboardSectionWrap: {
+  marginTop: 14,
+  padding: 12,
+  borderRadius: 18,
+  backgroundColor: '#F9FAFB',
+  borderWidth: 1,
+  borderColor: '#F3F4F6',
+  shadowOpacity: 0.10,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 10 },
+  elevation: 2,
+},
+
+dashboardSectionHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+
+dashboardSectionHeaderLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+},
+
+dashboardSectionIconWrap: {
+  width: 34,
+  height: 34,
+  borderRadius: 17,
+  backgroundColor: '#ffffff',
+  borderWidth: 1,
+  borderColor: 'rgba(0,0,0,0.06)',
+  alignItems: 'center',
+  justifyContent: 'center',
+  shadowColor: '#000',
+  shadowOpacity: 0.18,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 3,
+},
+
+dashboardSectionIcon: {
+  fontSize: 16,
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
+},
+
+dashboardSectionTitle: {
+  fontSize: 17,
+  fontWeight: '800',
+  color: '#4c0303',
+},
+
+dashboardSectionDivider: {
+  height: 1,
+  backgroundColor: '#EEF2F7',
+  marginTop: 10,
+  marginBottom: 12,
+},
+
 
 sectionBlock: {
   marginTop: 10,
@@ -590,7 +652,7 @@ emptyBody: {
 },
 
 feedbackText: {
-  fontSize: 14,
+  fontSize: 15,
   color: '#111827',
   marginTop: 6,
   lineHeight: 20,
@@ -598,18 +660,192 @@ feedbackText: {
 
 /* Pills */
 pill: {
-  borderRadius: 600,
-  padding:10,
-  backgroundColor: '#E10600',
+  borderRadius: 12,
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  backgroundColor: '#bb2b2b',
   borderWidth: 1,
-  borderColor: 'rgba(192, 43, 43, 0.18)',
-  elevation: 3,
+  borderColor: 'rgba(255,255,255,0.22)',
+  shadowColor: '#000',
+  shadowOpacity: 0.28,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 6,
 },
 
 pillText: {
   fontSize: 15,
   fontWeight: '800',
   color: '#ffffff',
+  letterSpacing: 0.2,
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
+},
+
+// Player Dashboard 3D pills
+playerPill: {
+  borderRadius: 12,
+  paddingVertical: 10,
+  paddingHorizontal: 10,
+  minHeight: 34,
+  backgroundColor: '#bb2b2b',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.22)',
+  shadowColor: '#000',
+  shadowOpacity: 0.28,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 6,
+},
+
+playerPillText: {
+  fontSize: 16,
+  fontWeight: '800',
+  color: '#ffffff',
+  letterSpacing: 0.2,
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
+},
+
+playerPillTextSm: {
+  fontSize: 12,
+  fontWeight: '800',
+  color: '#ffffff',
+  letterSpacing: 0.15,
+  textAlign: 'center',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
+},
+
+playerPillTall: {
+  minHeight: 40,
+  paddingVertical: 6,
+},
+
+requestItemCard: {
+  paddingBottom: 6,
+},
+
+requestStatusBadge: {
+  alignSelf: 'flex-end',
+  marginTop: 8,
+},
+
+statusBadge: {
+  alignSelf: 'flex-start',
+  borderRadius: 999,
+  paddingVertical: 8,
+  paddingHorizontal: 16,
+  borderWidth: 1,
+  shadowColor: '#000',
+  shadowOpacity: 0.2,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 3,
+},
+
+statusBadgeText: {
+  fontSize: 13,
+  fontWeight: '900',
+  color: '#ffffff',
+  letterSpacing: 0.4,
+},
+
+statusBadgeRequested: {
+  backgroundColor: '#f59e0b',
+  borderColor: 'rgba(255,255,255,0.2)',
+},
+
+statusBadgeAccepted: {
+  backgroundColor: '#167a3f',
+  borderColor: 'rgba(255,255,255,0.2)',
+},
+
+statusBadgeDeclined: {
+  backgroundColor: '#dc2626',
+  borderColor: 'rgba(255,255,255,0.2)',
+},
+
+statusBadgeCountered: {
+  backgroundColor: '#7c3aed',
+  borderColor: 'rgba(255,255,255,0.2)',
+},
+
+statusBadgeDefault: {
+  backgroundColor: '#6b7280',
+  borderColor: 'rgba(255,255,255,0.2)',
+},
+
+statusBadgeTextDark: {
+  color: '#111827',
+},
+
+playerPickerCard: {
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  backgroundColor: '#F9FAFB',
+  overflow: 'hidden',
+  marginBottom: 8,
+  shadowColor: '#000',
+  shadowOpacity: 0.08,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 8 },
+  elevation: 2,
+},
+
+aiCoachFab: {
+  position: 'absolute',
+  right: 16,
+  bottom: 10,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+aiCoachBubble: {
+  width: 56,
+  height: 56,
+  borderRadius: 28,
+  backgroundColor: '#bb2b2b',
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOpacity: 0.25,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 8 },
+  elevation: 6,
+},
+
+aiCoachIcon: {
+  fontSize: 22,
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
+},
+
+aiCoachLabel: {
+  marginTop: 6,
+  backgroundColor: '#ffffff',
+  borderRadius: 12,
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderWidth: 1,
+  borderColor: '#F3F4F6',
+  shadowColor: '#000',
+  shadowOpacity: 0.12,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 3,
+},
+
+aiCoachLabelText: {
+  fontSize: 11,
+  fontWeight: '900',
+  color: '#7f0606',
+  letterSpacing: 0.2,
 },
 
 /* Shimmer */
@@ -675,6 +911,16 @@ quickActionIconWrap: {
 
 quickActionEmoji: {
   fontSize: 22,
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
+},
+
+playerQuickActionEmoji: {
+  fontSize: 22,
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 
 quickActionText: {
@@ -792,6 +1038,30 @@ modalInput: {
   fontSize: 14,
   color: '#111111',
   backgroundColor: '#ffffff',
+},
+
+modalHintText: {
+  fontSize: 12,
+  color: '#6B7280',
+  marginBottom: 8,
+},
+
+modalInlineRow: {
+  flexDirection: 'row',
+  gap: 10,
+  marginBottom: 10,
+},
+
+modalInlineInput: {
+  flex: 1,
+  height: 40,
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  paddingHorizontal: 10,
+  fontSize: 13,
+  color: '#111111',
+  backgroundColor: '#F9FAFB',
 },
 
 modalButtonsRow: {
@@ -1119,10 +1389,13 @@ topRightLogo: {
   resizeMode: "cover",
   backgroundColor: "#FFFFFF",
 
-  shadowOpacity: 0.15,
-  shadowRadius: 10,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 3,
+  borderWidth: 1,
+  borderColor: "rgba(0,0,0,0.08)",
+  shadowColor: "#000",
+  shadowOpacity: 0.25,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 8 },
+  elevation: 6,
 },
 
 
@@ -1152,6 +1425,10 @@ fitnessTopTitle: {
   marginBottom: 6,
 },
 
+fitnessTopTextBlock: {
+  paddingRight: 90,
+},
+
 fitnessTopSubtitle: {
   fontSize: 14,
   color: '#6b7280',
@@ -1162,7 +1439,7 @@ fitnessTopSubtitle: {
 /* Segmented toggle (same feel as signup, but premium) */
 fitnessToggleWrap: {
   flexDirection: 'row',
-  backgroundColor: '#E10600',
+  backgroundColor: '#bb2b2b',
   borderRadius: 14,
   padding: 4,
 },
@@ -1559,21 +1836,32 @@ coachFitnessStatPill: {
   borderRadius: 12,
   paddingVertical: 10,
   paddingHorizontal: 12,
-  backgroundColor: '#f9fafb',
+  backgroundColor: '#bb2b2b',
   borderWidth: 1,
-  borderColor: '#eef2f7',
+  borderColor: 'rgba(255,255,255,0.22)',
+  shadowColor: '#000',
+  shadowOpacity: 0.28,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 6,
 },
 coachFitnessStatValue: {
-  fontSize: 19,
+  fontSize: 16,
   fontWeight: '800',
-  color: '#111827',
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachFitnessStatLabel: {
   marginTop: 2,
   fontSize: 12,
-  fontWeight: '700',
-  color: COACH_RED,
-  letterSpacing: 0.4,
+  fontWeight: '800',
+  color: 'rgba(255,255,255,0.9)',
+  letterSpacing: 0.2,
+  textShadowColor: 'rgba(0,0,0,0.3)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachFitnessSegWrap: {
   flexDirection: 'row',
@@ -1630,24 +1918,35 @@ coachFitnessCardTitle: {
   color: COACH_RED,
 },
 coachFitnessBadge: {
-  backgroundColor: 'rgba(198,40,40,0.12)',
+  backgroundColor: '#bb2b2b',
   borderRadius: 999,
   paddingHorizontal: 10,
   paddingVertical: 4,
   borderWidth: 1,
-  borderColor: 'rgba(198,40,40,0.18)',
+  borderColor: 'rgba(255,255,255,0.22)',
+  shadowColor: '#000',
+  shadowOpacity: 0.18,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 3 },
+  elevation: 3,
 },
 coachFitnessBadgeText: {
   fontSize: 12,
   fontWeight: '800',
-  color: COACH_RED,
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachFitnessBadgeSuccess: {
-  backgroundColor: 'rgba(16,185,129,0.12)',
-  borderColor: 'rgba(16,185,129,0.24)',
+  backgroundColor: '#167a3f',
+  borderColor: 'rgba(255,255,255,0.22)',
 },
 coachFitnessBadgeSuccessText: {
-  color: '#166534',
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachFitnessEmptyText: {
   fontSize: 15,
@@ -1684,22 +1983,28 @@ coachFitnessPill: {
   borderRadius: 999,
   paddingHorizontal: 8,
   paddingVertical: 4,
-  backgroundColor: 'rgba(225,6,0,0.10)',
+  backgroundColor: '#bb2b2b',
   borderWidth: 1,
-  borderColor: 'rgba(225,6,0,0.18)',
+  borderColor: 'rgba(255,255,255,0.22)',
 },
 coachFitnessPillText: {
   fontSize: 11,
   fontWeight: '800',
-  color: COACH_RED,
-  letterSpacing: 0.4,
+  color: '#ffffff',
+  letterSpacing: 0.2,
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachFitnessPillSuccess: {
-  backgroundColor: 'rgba(16,185,129,0.12)',
-  borderColor: 'rgba(16,185,129,0.25)',
+  backgroundColor: '#167a3f',
+  borderColor: 'rgba(255,255,255,0.22)',
 },
 coachFitnessPillSuccessText: {
-  color: '#166534',
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachFitnessBulletRow: {
   flexDirection: 'row',
@@ -1780,21 +2085,32 @@ coachAvailabilityStatPill: {
   borderRadius: 12,
   paddingVertical: 10,
   paddingHorizontal: 12,
-  backgroundColor: '#f9fafb',
+  backgroundColor: '#bb2b2b',
   borderWidth: 1,
-  borderColor: '#eef2f7',
+  borderColor: 'rgba(255,255,255,0.22)',
+  shadowColor: '#000',
+  shadowOpacity: 0.28,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 6,
 },
 coachAvailabilityStatValue: {
-  fontSize: 19,
+  fontSize: 16,
   fontWeight: '800',
-  color: '#111827',
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachAvailabilityStatLabel: {
   marginTop: 2,
   fontSize: 12,
-  fontWeight: '700',
-  color: COACH_RED,
-  letterSpacing: 0.4,
+  fontWeight: '800',
+  color: 'rgba(255,255,255,0.9)',
+  letterSpacing: 0.2,
+  textShadowColor: 'rgba(0,0,0,0.3)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachAvailabilitySectionTitle: {
   fontSize: 20,
@@ -1826,24 +2142,35 @@ coachAvailabilityCardTitle: {
   color: COACH_RED,
 },
 coachAvailabilityBadge: {
-  backgroundColor: 'rgba(198,40,40,0.12)',
+  backgroundColor: '#bb2b2b',
   borderRadius: 999,
   paddingHorizontal: 10,
   paddingVertical: 4,
   borderWidth: 1,
-  borderColor: 'rgba(198,40,40,0.18)',
+  borderColor: 'rgba(255,255,255,0.22)',
+  shadowColor: '#000',
+  shadowOpacity: 0.18,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 3 },
+  elevation: 3,
 },
 coachAvailabilityBadgeText: {
   fontSize: 12,
   fontWeight: '800',
-  color: COACH_RED,
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachAvailabilityBadgeBooked: {
-  backgroundColor: 'rgba(17,24,39,0.08)',
-  borderColor: 'rgba(17,24,39,0.14)',
+  backgroundColor: '#374151',
+  borderColor: 'rgba(255,255,255,0.22)',
 },
 coachAvailabilityBadgeBookedText: {
-  color: '#374151',
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachAvailabilityInfoText: {
   marginTop: 8,
@@ -1887,22 +2214,28 @@ coachAvailabilitySlotBadge: {
   borderRadius: 999,
   paddingHorizontal: 8,
   paddingVertical: 4,
-  backgroundColor: 'rgba(225,6,0,0.10)',
+  backgroundColor: '#bb2b2b',
   borderWidth: 1,
-  borderColor: 'rgba(225,6,0,0.18)',
+  borderColor: 'rgba(255,255,255,0.22)',
 },
 coachAvailabilitySlotBadgeText: {
   fontSize: 11,
   fontWeight: '800',
-  color: COACH_RED,
-  letterSpacing: 0.4,
+  color: '#ffffff',
+  letterSpacing: 0.2,
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachAvailabilitySlotBadgeBooked: {
-  backgroundColor: 'rgba(17,24,39,0.08)',
-  borderColor: 'rgba(17,24,39,0.14)',
+  backgroundColor: '#374151',
+  borderColor: 'rgba(255,255,255,0.22)',
 },
 coachAvailabilitySlotBadgeBookedText: {
-  color: '#374151',
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 
 /* ===========================
@@ -1945,21 +2278,32 @@ coachBookingStatPill: {
   borderRadius: 12,
   paddingVertical: 10,
   paddingHorizontal: 12,
-  backgroundColor: '#f9fafb',
+  backgroundColor: '#bb2b2b',
   borderWidth: 1,
-  borderColor: '#eef2f7',
+  borderColor: 'rgba(255,255,255,0.22)',
+  shadowColor: '#000',
+  shadowOpacity: 0.28,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 6,
 },
 coachBookingStatValue: {
-  fontSize: 19,
+  fontSize: 16,
   fontWeight: '800',
-  color: '#111827',
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachBookingStatLabel: {
   marginTop: 2,
   fontSize: 12,
-  fontWeight: '700',
-  color: COACH_RED,
-  letterSpacing: 0.4,
+  fontWeight: '800',
+  color: 'rgba(255,255,255,0.9)',
+  letterSpacing: 0.2,
+  textShadowColor: 'rgba(0,0,0,0.3)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachBookingSectionTitle: {
   fontSize: 20,
@@ -2014,15 +2358,18 @@ coachBookingBadge: {
   borderRadius: 999,
   paddingHorizontal: 8,
   paddingVertical: 4,
-  backgroundColor: 'rgba(225,6,0,0.10)',
+  backgroundColor: '#bb2b2b',
   borderWidth: 1,
-  borderColor: 'rgba(225,6,0,0.18)',
+  borderColor: 'rgba(255,255,255,0.22)',
 },
 coachBookingBadgeText: {
   fontSize: 11,
   fontWeight: '800',
-  color: COACH_RED,
-  letterSpacing: 0.4,
+  color: '#ffffff',
+  letterSpacing: 0.2,
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 /////////////////////////
 
@@ -2333,10 +2680,7 @@ roleToggleTextActive: {
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
-  playerQuickActionEmoji: {
-    fontSize: 18,
-    marginBottom: 4,
-  },
+  
   playerQuickActionText: {
     fontSize: 13,
     fontWeight: '600',
@@ -2804,24 +3148,37 @@ coachVideoCTA: {
 coachStatusPill: {
   paddingHorizontal: 10,
   paddingVertical: 6,
-  borderRadius: 999,
+  borderRadius: 12,
   marginLeft:120,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.22)',
+  shadowColor: '#000',
+  shadowOpacity: 0.18,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 3 },
+  elevation: 3,
 },
 coachStatusPillPending: {
-  backgroundColor: '#fee2e2',
+  backgroundColor: '#bb2b2b',
 },
 coachStatusPillDone: {
-  backgroundColor: '#dcfce7',
+  backgroundColor: '#167a3f',
 },
 coachStatusText: {
   fontSize: 12,
   fontWeight: '700',
 },
 coachStatusTextPending: {
-  color: COACH_RED,
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 coachStatusTextDone: {
-  color: '#166534',
+  color: '#ffffff',
+  textShadowColor: 'rgba(0,0,0,0.35)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
 },
 
 coachReviewHeaderRow: {

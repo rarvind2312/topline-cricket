@@ -112,10 +112,37 @@ export default function CoachBookingRequestsScreenBody({ navigation }: Props) {
     const data: any = snap.data();
     const slots: Slot[] = Array.isArray(data?.slots) ? data.slots : [];
 
-    const updated = slots.map(s => {
-      const match = s.start === req.slotStart && s.end === req.slotEnd;
-      return match ? { ...s, isBooked: true } : s;
-    });
+    const toMinutes = (hhmm: string) => {
+      const [h, m] = String(hhmm || '').split(':').map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) return -1;
+      return h * 60 + m;
+    };
+
+    const reqStartM = toMinutes(req.slotStart);
+    const reqEndM = toMinutes(req.slotEnd);
+    if (reqStartM < 0 || reqEndM <= reqStartM) return;
+
+    let didSplit = false;
+    const updated: Slot[] = [];
+
+    for (const s of slots) {
+      const sStartM = toMinutes(s.start);
+      const sEndM = toMinutes(s.end);
+      if (!s.isBooked && sStartM >= 0 && sEndM >= 0 && sStartM <= reqStartM && sEndM >= reqEndM) {
+        didSplit = true;
+        if (sStartM < reqStartM) {
+          updated.push({ ...s, end: req.slotStart, isBooked: false });
+        }
+        updated.push({ ...s, start: req.slotStart, end: req.slotEnd, isBooked: true });
+        if (reqEndM < sEndM) {
+          updated.push({ ...s, start: req.slotEnd, end: s.end, isBooked: false });
+        }
+      } else {
+        updated.push(s);
+      }
+    }
+
+    if (!didSplit) return;
 
     await updateDoc(ref, {
       slots: updated,
@@ -206,35 +233,46 @@ export default function CoachBookingRequestsScreenBody({ navigation }: Props) {
             </View>
           </View>
 
-          <Text style={styles.coachBookingSectionTitle}>Pending Requests</Text>
-          <View style={styles.coachBookingCard}>
-            {requests.length === 0 ? (
-              <Text style={styles.coachBookingEmptyText}>No booking requests.</Text>
-            ) : (
-              requests.map(r => (
-                <View key={r.id} style={styles.coachBookingRequestItem}>
-                  <View style={styles.coachBookingRequestHeaderRow}>
-                    <Text style={styles.coachBookingRequestTitle}>
-                      {r.playerName || 'Player'}
-                    </Text>
-                    <View style={styles.coachBookingBadge}>
-                      <Text style={styles.coachBookingBadgeText}>Requested</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.coachBookingRequestMeta}>
-                    {formatRequestDate(r.date)} • {r.slotStart} – {r.slotEnd}
-                  </Text>
-
-                  <TouchableOpacity style={[styles.primaryButton, { marginTop: 10 }]} onPress={() => acceptRequest(r)}>
-                    <Text style={styles.primaryButtonText}>Accept</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={[styles.secondaryButton, { marginTop: 8 }]} onPress={() => declineRequest(r.id)}>
-                    <Text style={styles.secondaryButtonText}>Decline</Text>
-                  </TouchableOpacity>
+          <View style={styles.dashboardSectionWrap}>
+            <View style={styles.dashboardSectionHeader}>
+              <View style={styles.dashboardSectionHeaderLeft}>
+                <View style={styles.dashboardSectionIconWrap}>
+                  <Text style={styles.dashboardSectionIcon}>📥</Text>
                 </View>
-              ))
-            )}
+                <Text style={styles.dashboardSectionTitle}>Pending Requests</Text>
+              </View>
+            </View>
+            <View style={styles.dashboardSectionDivider} />
+
+            <View style={styles.coachBookingCard}>
+              {requests.length === 0 ? (
+                <Text style={styles.coachBookingEmptyText}>No booking requests.</Text>
+              ) : (
+                requests.map(r => (
+                  <View key={r.id} style={styles.coachBookingRequestItem}>
+                    <View style={styles.coachBookingRequestHeaderRow}>
+                      <Text style={styles.coachBookingRequestTitle}>
+                        {r.playerName || 'Player'}
+                      </Text>
+                      <View style={styles.coachBookingBadge}>
+                        <Text style={styles.coachBookingBadgeText}>Requested</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.coachBookingRequestMeta}>
+                      {formatRequestDate(r.date)} • {r.slotStart} – {r.slotEnd}
+                    </Text>
+
+                    <TouchableOpacity style={[styles.primaryButton, { marginTop: 10 }]} onPress={() => acceptRequest(r)}>
+                      <Text style={styles.primaryButtonText}>Accept</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.secondaryButton, { marginTop: 8 }]} onPress={() => declineRequest(r.id)}>
+                      <Text style={styles.secondaryButtonText}>Decline</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </View>
           </View>
 
           <TouchableOpacity

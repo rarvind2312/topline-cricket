@@ -174,6 +174,10 @@ const [videoPrivacyAccepted, setVideoPrivacyAccepted] = useState(false);
   const [playerIsKeeper, setPlayerIsKeeper] = useState(false);
   const [playerLevel, setPlayerLevel] = useState<string | null>(null);
   const [playCricketUrl, setPlayCricketUrl] = useState('');
+  const [heightCm, setHeightCm] = useState('');
+  const [weightKg, setWeightKg] = useState('');
+  const [battingHand, setBattingHand] = useState('');
+  const [bowlingHand, setBowlingHand] = useState('');
 
   // Player picker modal
   const [showPlayerLevelPicker, setShowPlayerLevelPicker] = useState(false);
@@ -293,12 +297,18 @@ const [coachConsentAccepted, setCoachConsentAccepted] = useState(false);
 
       if (selectedRole === 'player') {
         const playerType = derivePlayerType();
+        const battingHandNorm = battingHand.trim().toUpperCase();
+        const bowlingHandNorm = bowlingHand.trim().toUpperCase();
 
         const profile: AppUserProfile = {
           ...baseProfile,
           dob: dob.trim(),
           ...(playerType ? { playerType } : {}),
           ...(playerLevel ? { playerLevel } : {}),
+          ...(heightCm.trim() ? { heightCm: heightCm.trim() } : {}),
+          ...(weightKg.trim() ? { weightKg: weightKg.trim() } : {}),
+          ...(battingHandNorm ? { battingHand: battingHandNorm } : {}),
+          ...(bowlingHandNorm ? { bowlingHand: bowlingHandNorm } : {}),
           ...(playCricketUrl.trim() ? { playCricketUrl: playCricketUrl.trim() } : {}),
           consents: {
             videoPrivacyAccepted: true,
@@ -485,6 +495,48 @@ const [coachConsentAccepted, setCoachConsentAccepted] = useState(false);
                 {playerLevel || 'Select...'}
               </Text>
             </TouchableOpacity>
+
+            <Text style={styles.label}>Approx Height (cm)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., 170"
+              placeholderTextColor="#9ca3af"
+              value={heightCm}
+              keyboardType="numeric"
+              onChangeText={setHeightCm}
+            />
+
+            <Text style={styles.label}>Approx Weight (kg)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., 65"
+              placeholderTextColor="#9ca3af"
+              value={weightKg}
+              keyboardType="numeric"
+              onChangeText={setWeightKg}
+            />
+
+            <Text style={styles.label}>Batting Hand (RH / LH)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="RH or LH"
+              placeholderTextColor="#9ca3af"
+              value={battingHand}
+              autoCapitalize="characters"
+              maxLength={2}
+              onChangeText={setBattingHand}
+            />
+
+            <Text style={styles.label}>Bowling Hand (RH / LH)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="RH or LH"
+              placeholderTextColor="#9ca3af"
+              value={bowlingHand}
+              autoCapitalize="characters"
+              maxLength={2}
+              onChangeText={setBowlingHand}
+            />
 
             <Text style={styles.label}>PlayCricket Profile Link (optional)</Text>
             <TextInput

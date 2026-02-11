@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
+  Image,
+  Modal,
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
@@ -15,6 +17,8 @@ import {
 import { styles } from '../styles/styles';
 import { useAuth } from '../context/AuthContext';
 import { db, serverTimestamp } from '../firebase';
+import { askAI } from '../services/askAI';
+import { updateUserProfile } from '../services/userProfile';
 
 import {
   addDoc,
@@ -29,6 +33,8 @@ import {
 } from 'firebase/firestore';
 
 import { safeToDate, formatDayDateTime } from '../utils/dateFormatter';
+
+const TOPLINE_LOGO = require('../../assets/topline-cricket-image.jpg');
 
 type Drill = { drill: string; reps: string; sets: string; notes: string };
 
@@ -81,6 +87,19 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
 
   const [shareToCoach, setShareToCoach] = useState(true);
   const [drills, setDrills] = useState<Drill[]>([emptyDrill()]);
+  const [askVisible, setAskVisible] = useState(false);
+  const [askQuestion, setAskQuestion] = useState('');
+  const [askAnswer, setAskAnswer] = useState('');
+  const [askLoading, setAskLoading] = useState(false);
+  const [heightCm, setHeightCm] = useState('');
+  const [weightKg, setWeightKg] = useState('');
+  const [battingHand, setBattingHand] = useState('');
+  const [bowlingHand, setBowlingHand] = useState('');
+  const needsProfile =
+    !String((user as any)?.heightCm || '').trim() ||
+    !String((user as any)?.weightKg || '').trim() ||
+    !String((user as any)?.battingHand || '').trim() ||
+    !String((user as any)?.bowlingHand || '').trim();
 
   const updateDrill = (index: number, patch: Partial<Drill>) => {
     setDrills(prev => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)));
@@ -92,6 +111,77 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
 
   const removeDrill = (index: number) => {
     setDrills(prev => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
+  const openAskAI = () => {
+    setAskQuestion('');
+    setAskAnswer('');
+    setHeightCm(String((user as any)?.heightCm || ''));
+    setWeightKg(String((user as any)?.weightKg || ''));
+    setBattingHand(String((user as any)?.battingHand || ''));
+    setBowlingHand(String((user as any)?.bowlingHand || ''));
+    setAskVisible(true);
+  };
+
+  const closeAskAI = () => setAskVisible(false);
+
+  const normalizeHand = (v: string) => {
+    const t = v.trim().toUpperCase();
+    if (!t) return '';
+    if (t.startsWith('R')) return 'RH';
+    if (t.startsWith('L')) return 'LH';
+    return t;
+  };
+
+  const saveAskProfile = async () => {
+    if (!uid) return;
+    const updates: any = {};
+    const currentHeight = String((user as any)?.heightCm || '').trim();
+    const currentWeight = String((user as any)?.weightKg || '').trim();
+    const currentBat = String((user as any)?.battingHand || '').trim().toUpperCase();
+    const currentBowl = String((user as any)?.bowlingHand || '').trim().toUpperCase();
+
+    const nextHeight = heightCm.trim();
+    const nextWeight = weightKg.trim();
+    const nextBat = normalizeHand(battingHand);
+    const nextBowl = normalizeHand(bowlingHand);
+
+    if (nextHeight && nextHeight !== currentHeight) updates.heightCm = nextHeight;
+    if (nextWeight && nextWeight !== currentWeight) updates.weightKg = nextWeight;
+    if ((nextBat === 'RH' || nextBat === 'LH') && nextBat !== currentBat) updates.battingHand = nextBat;
+    if ((nextBowl === 'RH' || nextBowl === 'LH') && nextBowl !== currentBowl) updates.bowlingHand = nextBowl;
+
+    if (Object.keys(updates).length > 0) {
+      try {
+        await updateUserProfile(uid, updates);
+      } catch (e) {
+        console.log('Save AI profile failed (non-blocking):', e);
+      }
+    }
+  };
+
+  const submitAskAI = async () => {
+    if (askLoading) return;
+    const q = askQuestion.trim();
+    if (!q) {
+      Alert.alert('Type a question', 'Please enter a question for the AI.');
+      return;
+    }
+    try {
+      setAskLoading(true);
+      await saveAskProfile();
+      const res = await askAI(q);
+      setAskAnswer(res.answer || '');
+    } catch (e: any) {
+      const code = String(e?.code || '');
+      if (code.includes('resource-exhausted')) {
+        Alert.alert('Limit reached', 'You have used your 5 free questions for this month.');
+      } else {
+        Alert.alert('Ask AI failed', e?.message || 'Please try again.');
+      }
+    } finally {
+      setAskLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -269,22 +359,33 @@ export default function PlayerFitnessScreenBody({ navigation }: any) {
     }
   };
 
- const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
-const visibleHistory: FitnessEntry[] = historyExpanded
-  ? historyEntries
-  : historyEntries.slice(0, 2);
+  const filteredHistory = historyEntries.filter((h) =>
+    tab === 'coach' ? h.source === 'coach' : h.source === 'player'
+  );
+
+  const visibleHistory: FitnessEntry[] = historyExpanded
+    ? filteredHistory
+    : filteredHistory.slice(0, 2);
 
   return (
     <SafeAreaView style={styles.screenContainer}>
       <KeyboardAvoidingView style={styles.flex1} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.formScroll} keyboardShouldPersistTaps="handled">
+        <View style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={[styles.formScroll, { paddingBottom: 120 }]} keyboardShouldPersistTaps="handled">
+          <View style={styles.topRightLogoContainer}>
+            <Image source={TOPLINE_LOGO} style={styles.topRightLogo} />
+          </View>
+
           {/* Premium header */}
           <View style={styles.fitnessTopCard}>
-            <Text style={styles.fitnessTopTitle}>Fitness</Text>
-            <Text style={styles.fitnessTopSubtitle}>
-              Track coach drills or log your training. Keep it consistent and build progress.
-            </Text>
+            <View style={styles.fitnessTopTextBlock}>
+              <Text style={styles.fitnessTopTitle}>Fitness</Text>
+              <Text style={styles.fitnessTopSubtitle}>
+                Track coach drills or log your training. Keep it consistent and build progress.
+              </Text>
+            </View>
 
             {/* Seg toggle */}
             <View style={styles.fitnessToggleWrap}>
@@ -310,14 +411,21 @@ const visibleHistory: FitnessEntry[] = historyExpanded
             </View>
           </View>
 
+
           {/* ---------------- Coach Assigned ---------------- */}
           {tab === 'coach' ? (
             <>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Coach Suggested Drills</Text>
-              </View>
+              <View style={styles.dashboardSectionWrap}>
+                <View style={styles.dashboardSectionHeader}>
+                  <View style={styles.dashboardSectionHeaderLeft}>
+                    <View style={styles.dashboardSectionIconWrap}>
+                      <Text style={styles.dashboardSectionIcon}>🏋️</Text>
+                    </View>
+                    <Text style={styles.dashboardSectionTitle}>Coach Suggested Drills</Text>
+                  </View>
+                </View>
+                <View style={styles.dashboardSectionDivider} />
 
-              <View style={styles.sectionBlock}>
                 <View style={styles.toplineSectionCard}>
                   {coachAssigned.length === 0 ? (
                     <Text style={styles.emptyBody}>No drills assigned by coach yet.</Text>
@@ -365,11 +473,17 @@ const visibleHistory: FitnessEntry[] = historyExpanded
           {/* ---------------- Self Performed ---------------- */}
           {tab === 'self' ? (
             <>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Log your training</Text>
-              </View>
+              <View style={styles.dashboardSectionWrap}>
+                <View style={styles.dashboardSectionHeader}>
+                  <View style={styles.dashboardSectionHeaderLeft}>
+                    <View style={styles.dashboardSectionIconWrap}>
+                      <Text style={styles.dashboardSectionIcon}>🧾</Text>
+                    </View>
+                    <Text style={styles.dashboardSectionTitle}>Log your training</Text>
+                  </View>
+                </View>
+                <View style={styles.dashboardSectionDivider} />
 
-              <View style={styles.sectionBlock}>
                 <View style={styles.toplineSectionCard}>
                   {/* Share toggle */}
                   {preferredCoachId ? (
@@ -476,68 +590,168 @@ const visibleHistory: FitnessEntry[] = historyExpanded
           ) : null}
 
           {/* ---------------- History (last 2) ---------------- */}
-          <View style={styles.sectionHeaderRow}>
-  <Text style={styles.sectionTitle}>History</Text>
+          <View style={styles.dashboardSectionWrap}>
+            <View style={styles.dashboardSectionHeader}>
+              <View style={styles.dashboardSectionHeaderLeft}>
+                <View style={styles.dashboardSectionIconWrap}>
+                  <Text style={styles.dashboardSectionIcon}>🕘</Text>
+                </View>
+                <Text style={styles.dashboardSectionTitle}>History</Text>
+              </View>
+              {filteredHistory.length > 2 ? (
+                <TouchableOpacity
+                  onPress={() => setHistoryExpanded((v: boolean) => !v)}
+                  activeOpacity={0.85}
+                  style={styles.historyToggleBtn}
+                >
+                  <Text style={styles.historyToggleText}>
+                    {historyExpanded ? 'Show less' : 'Show all'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={styles.dashboardSectionDivider} />
 
-  {historyEntries.length > 2 ? (
-    <TouchableOpacity
-      onPress={() => setHistoryExpanded((v: boolean) => !v)}
-      activeOpacity={0.85}
-      style={styles.historyToggleBtn}
-    >
-      <Text style={styles.historyToggleText}>
-        {historyExpanded ? 'Show less' : 'Show all'}
-      </Text>
-    </TouchableOpacity>
-  ) : null}
-</View>
-          {visibleHistory.length === 0 ? (
-  <Text style={styles.emptyBody}>No history yet.</Text>
-) : (
-  visibleHistory.map((h: FitnessEntry) => (
-    <View key={h.id} style={styles.fitnessHistoryItem}>
-      <View style={styles.fitnessHistoryTopRow}>
-        <Text style={styles.fitnessHistoryDate} numberOfLines={1}>
-          {h.createdAtLabel || ''}
-        </Text>
+            {visibleHistory.length === 0 ? (
+              <Text style={styles.emptyBody}>No history yet.</Text>
+            ) : (
+              visibleHistory.map((h: FitnessEntry) => (
+                <View key={h.id} style={styles.fitnessHistoryItem}>
+                  <View style={styles.fitnessHistoryTopRow}>
+                    <Text style={styles.fitnessHistoryDate} numberOfLines={1}>
+                      {h.createdAtLabel || ''}
+                    </Text>
 
-        <View
-          style={[
-            styles.fitnessHistoryPill,
-            h.source === 'coach'
-              ? styles.fitnessHistoryPillCoach
-              : styles.fitnessHistoryPillSelf,
-          ]}
-        >
-          <Text style={styles.fitnessHistoryPillText}>
-            {h.source === 'coach' ? 'COACH' : (h.sharedToCoach ? 'SHARED' : 'SELF')}
-          </Text>
-        </View>
-      </View>
+                    <View
+                      style={[
+                        styles.fitnessHistoryPill,
+                        h.source === 'coach'
+                          ? styles.fitnessHistoryPillCoach
+                          : styles.fitnessHistoryPillSelf,
+                      ]}
+                    >
+                      <Text style={styles.fitnessHistoryPillText}>
+                        {h.source === 'coach' ? 'COACH' : (h.sharedToCoach ? 'SHARED' : 'SELF')}
+                      </Text>
+                    </View>
+                  </View>
 
-      <Text style={styles.fitnessHistoryMeta}>
-        {h.source === 'coach'
-          ? `Coach Assigned • Completed ${h.completedAtLabel || ''}`
-          : h.sharedToCoach
-            ? `Shared to ${h.coachName || 'Coach'}`
-            : 'Self Training'}
-      </Text>
+                  <Text style={styles.fitnessHistoryMeta}>
+                    {h.source === 'coach'
+                      ? `Coach Assigned • Completed ${h.completedAtLabel || ''}`
+                      : h.sharedToCoach
+                        ? `Shared to ${h.coachName || 'Coach'}`
+                        : 'Self Training'}
+                  </Text>
 
-      <View style={styles.fitnessDivider} />
+                  <View style={styles.fitnessDivider} />
 
-      {h.drills.slice(0, MAX_DRILLS).map((d: Drill, i: number) => (
-        <View key={i} style={styles.fitnessBulletRow}>
-          <Text style={styles.fitnessBulletDot}>•</Text>
-          <Text style={styles.fitnessBulletText}>
-            {d.drill}
-            {d.reps ? ` — Reps: ${d.reps}` : ''}
-            {d.sets ? `, Sets: ${d.sets}` : ''}
-          </Text>
-        </View>
-      ))}
-    </View>
-  ))
-)}
+                  {h.drills.slice(0, MAX_DRILLS).map((d: Drill, i: number) => (
+                    <View key={i} style={styles.fitnessBulletRow}>
+                      <Text style={styles.fitnessBulletDot}>•</Text>
+                      <Text style={styles.fitnessBulletText}>
+                        {d.drill}
+                        {d.reps ? ` — Reps: ${d.reps}` : ''}
+                        {d.sets ? `, Sets: ${d.sets}` : ''}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ))
+            )}
+          </View>
+
+          {/* Ask AI Modal */}
+          <Modal visible={askVisible} transparent animationType="fade" onRequestClose={closeAskAI}>
+            <View style={styles.modalBackdrop}>
+              <View style={styles.modalCard}>
+                <Text style={styles.modalTitle}>Ask AI</Text>
+                <Text style={styles.modalHintText}>
+                  How to ask: goal + context + timeframe. Example: “RH batter, club level, want better timing in 2 weeks.”
+                </Text>
+                {needsProfile ? (
+                  <>
+                    <Text style={styles.modalHintText}>
+                      Add optional profile details for better tips.
+                    </Text>
+                    <View style={styles.modalInlineRow}>
+                      <TextInput
+                        style={styles.modalInlineInput}
+                        placeholder="Height (cm)"
+                        placeholderTextColor="#9ca3af"
+                        value={heightCm}
+                        keyboardType="numeric"
+                        onChangeText={setHeightCm}
+                      />
+                      <TextInput
+                        style={styles.modalInlineInput}
+                        placeholder="Weight (kg)"
+                        placeholderTextColor="#9ca3af"
+                        value={weightKg}
+                        keyboardType="numeric"
+                        onChangeText={setWeightKg}
+                      />
+                    </View>
+                    <View style={styles.modalInlineRow}>
+                      <TextInput
+                        style={styles.modalInlineInput}
+                        placeholder="Batting hand (RH/LH)"
+                        placeholderTextColor="#9ca3af"
+                        value={battingHand}
+                        autoCapitalize="characters"
+                        maxLength={2}
+                        onChangeText={setBattingHand}
+                      />
+                      <TextInput
+                        style={styles.modalInlineInput}
+                        placeholder="Bowling hand (RH/LH)"
+                        placeholderTextColor="#9ca3af"
+                        value={bowlingHand}
+                        autoCapitalize="characters"
+                        maxLength={2}
+                        onChangeText={setBowlingHand}
+                      />
+                    </View>
+                  </>
+                ) : null}
+                <TextInput
+                  style={styles.modalTextArea}
+                  placeholder="Ask a question about your training…"
+                  value={askQuestion}
+                  onChangeText={setAskQuestion}
+                  multiline
+                />
+
+                {askAnswer ? (
+                  <View style={styles.modalScrollBox}>
+                    <Text style={styles.modalBodyText}>{askAnswer}</Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.modalButtonsRow}>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.modalBtnSecondary]}
+                    onPress={closeAskAI}
+                  >
+                    <Text style={styles.modalBtnSecondaryText}>Close</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modalBtn,
+                      styles.modalBtnPrimary,
+                      askLoading ? { opacity: 0.6 } : null,
+                    ]}
+                    onPress={submitAskAI}
+                    disabled={askLoading}
+                  >
+                    <Text style={styles.modalBtnPrimaryText}>
+                      {askLoading ? 'Asking…' : 'Ask AI'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           <TouchableOpacity
             style={[styles.secondaryButton, { marginTop: 20, marginBottom: 30 }]}
@@ -546,7 +760,17 @@ const visibleHistory: FitnessEntry[] = historyExpanded
           >
             <Text style={styles.secondaryButtonText}>⬅ Return to Player Dashboard</Text>
           </TouchableOpacity>
-        </ScrollView>
+          </ScrollView>
+
+          <TouchableOpacity style={styles.aiCoachFab} onPress={openAskAI} activeOpacity={0.9}>
+            <View style={styles.aiCoachBubble}>
+              <Text style={styles.aiCoachIcon}>🤖</Text>
+            </View>
+            <View style={styles.aiCoachLabel}>
+              <Text style={styles.aiCoachLabelText}>Topline AI Coach</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

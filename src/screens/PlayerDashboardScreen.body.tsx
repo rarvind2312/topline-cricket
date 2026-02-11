@@ -21,11 +21,12 @@ import { styles } from '../styles/styles';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList, PlayerKeyStats } from '../types';
-import { updatePlayerKeyStats } from '../services/userProfile';
+import { updatePlayerKeyStats, updateUserProfile } from '../services/userProfile';
 
 // ✅ shared date utils
 import {
   safeToDate,
+  formatDayDate,
   formatDayDateTime,
   formatDayDateFromYYYYMMDD,
 } from '../utils/dateFormatter';
@@ -60,6 +61,13 @@ function parseSessionStartLocal(dateStr?: string, startHHMM?: string): Date | nu
   if (!y || !mo || !da || Number.isNaN(h) || Number.isNaN(mi)) return null;
   const d = new Date(y, mo - 1, da, h, mi, 0, 0);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function toLocalDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 export default function PlayerDashboardScreenBody({ navigation }: Props) {
@@ -198,7 +206,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
                 coachName: v.coachName,
                 skill: v.skill || 'Practice',
                 feedback: v.feedback,
-                createdAtLabel: dt ? formatDayDateTime(dt) : undefined,
+                createdAtLabel: dt ? formatDayDate(dt) : undefined,
                 __ts: dt?.getTime?.() ?? 0,
               };
             });
@@ -217,7 +225,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
                 coachName: v.coachName,
                 skill: v.skill || 'Coaching Video',
                 feedback: v.notes, // ✅ show as feedback text
-                createdAtLabel: dt ? formatDayDateTime(dt) : undefined,
+                createdAtLabel: dt ? formatDayDate(dt) : undefined,
                 __ts: dt?.getTime?.() ?? 0,
               };
             });
@@ -258,7 +266,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
                 coachName: x.coachName || 'Coach',
                 kind: 'Fitness Review',
                 feedback: coachNote,
-                createdAtLabel: dt ? formatDayDateTime(dt) : undefined,
+                createdAtLabel: dt ? formatDayDate(dt) : undefined,
                 __ts: dt?.getTime?.() ?? 0,
               };
             })
@@ -305,7 +313,20 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
   const [wickets, setWickets] = useState('');
   const [bestBowling, setBestBowling] = useState('');
 
+  // -----------------------------
+  // Player profile details (editable)
+  // -----------------------------
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [heightCm, setHeightCm] = useState('');
+  const [weightKg, setWeightKg] = useState('');
+  const [batSize, setBatSize] = useState('');
+  const [batWeight, setBatWeight] = useState('');
+  const [battingHand, setBattingHand] = useState('');
+  const [bowlingHand, setBowlingHand] = useState('');
+  const [padsSize, setPadsSize] = useState('');
+
   useEffect(() => {
+    if (statsModalVisible || profileModalVisible) return;
     const ks = ((profile as any)?.keyStats as PlayerKeyStats) ?? null;
     setKeyStats(ks);
 
@@ -324,11 +345,53 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
       setWickets('');
       setBestBowling('');
     }
-  }, [profile]);
+  }, [profile, statsModalVisible, profileModalVisible]);
+
+  useEffect(() => {
+    if (profileModalVisible) return;
+    setHeightCm(String((profile as any)?.heightCm || ''));
+    setWeightKg(String((profile as any)?.weightKg || ''));
+    setBatSize(String((profile as any)?.batSize || ''));
+    setBatWeight(String((profile as any)?.batWeight || ''));
+    setBattingHand(String((profile as any)?.battingHand || ''));
+    setBowlingHand(String((profile as any)?.bowlingHand || ''));
+    setPadsSize(String((profile as any)?.padsSize || ''));
+  }, [profile, profileModalVisible]);
 
   const openStatsEditor = () => {
     if ((profile as any)?.role && (profile as any)?.role !== 'player') return;
     setStatsModalVisible(true);
+  };
+
+  const openProfileEditor = () => {
+    if ((profile as any)?.role && (profile as any)?.role !== 'player') return;
+    setProfileModalVisible(true);
+  };
+
+  const normalizeHand = (v: string) => {
+    const t = v.trim().toUpperCase();
+    if (!t) return '';
+    if (t.startsWith('R')) return 'RH';
+    if (t.startsWith('L')) return 'LH';
+    return t;
+  };
+
+  const saveProfileDetails = async () => {
+    if (!uid) return;
+    try {
+      await updateUserProfile(uid, {
+        heightCm: heightCm.trim(),
+        weightKg: weightKg.trim(),
+        batSize: batSize.trim(),
+        batWeight: batWeight.trim(),
+        battingHand: normalizeHand(battingHand),
+        bowlingHand: normalizeHand(bowlingHand),
+        padsSize: padsSize.trim(),
+      });
+      setProfileModalVisible(false);
+    } catch (e: any) {
+      Alert.alert('Failed to save profile', e?.message ?? 'Please try again.');
+    }
   };
 
   const saveStats = async () => {
@@ -401,9 +464,21 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
         const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
         rows.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
 
-        const visible = rows.filter((r) =>
-          ['requested', 'countered'].includes(String(r.status || '').toLowerCase())
-        );
+        const visible = rows.filter((r) => {
+          const st = String(r.status || '').toLowerCase();
+          const dateKey = String(r.date || '');
+          const todayKey = toLocalDateKey(new Date());
+
+          if (st === 'requested' || st === 'countered') {
+            return !dateKey || dateKey >= todayKey;
+          }
+
+          if (st === 'accepted' || st === 'declined') {
+            return !!dateKey && dateKey === todayKey;
+          }
+
+          return false;
+        });
 
         setPendingRequests(visible);
       },
@@ -441,199 +516,299 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
         </View>
 
         {/* Upcoming Session */}
-        <>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Upcoming Session</Text>
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>🗓️</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Upcoming Session</Text>
+            </View>
           </View>
+          <View style={styles.dashboardSectionDivider} />
 
-          <View style={styles.sectionBlock}>
-            {loadingUpcoming ? (
-              <View style={styles.toplineSectionCard}>
-                <View style={styles.shimmerBox}>
-                  <Animated.View
-                    style={[styles.shimmerOverlay, { transform: [{ translateX: shimmerTranslateX }] }]}
-                  >
-                    <LinearGradient
-                      colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={{ flex: 1 }}
-                    />
-                  </Animated.View>
-                </View>
-                <View style={{ height: 12 }} />
-                <View style={[styles.shimmerBox, { height: 18, width: '55%' }]} />
+          {loadingUpcoming ? (
+            <View style={styles.toplineSectionCard}>
+              <View style={styles.shimmerBox}>
+                <Animated.View
+                  style={[styles.shimmerOverlay, { transform: [{ translateX: shimmerTranslateX }] }]}
+                >
+                  <LinearGradient
+                    colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ flex: 1 }}
+                  />
+                </Animated.View>
               </View>
-            ) : upcoming ? (
-              <View style={styles.toplineSectionCard}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={styles.bigTitle}>{upcoming.skill || 'Session'}</Text>
-                  <View style={[styles.pill, { alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={styles.pillText}>
-                      {String(upcoming.status || 'UPCOMING').toUpperCase()}
-                    </Text>
-                  </View>
+              <View style={{ height: 12 }} />
+              <View style={[styles.shimmerBox, { height: 18, width: '55%' }]} />
+            </View>
+          ) : upcoming ? (
+            <View style={styles.toplineSectionCard}>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={[styles.playerPill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={styles.playerPillText} numberOfLines={1}>
+                    👤 {String(upcoming.coachName || '—')}
+                  </Text>
                 </View>
 
-                <View style={styles.divider} />
-
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={styles.pillText}>👤 {String(upcoming.coachName || '—')}</Text>
-                  </View>
-
-                  <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={styles.pillText}>
-                      🗓{' '}
-                      {upcoming.date
-                        ? `${formatDayDateFromYYYYMMDD(upcoming.date)} ${upcoming.start ?? ''}`.trim()
-                        : '—'}
-                    </Text>
-                  </View>
+                <View style={[styles.playerPill, styles.playerPillTall, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={styles.playerPillTextSm} numberOfLines={2}>
+                    🗓{' '}
+                    {upcoming.date
+                      ? `${formatDayDateFromYYYYMMDD(upcoming.date)} ${upcoming.start ?? ''}`.trim()
+                      : '—'}
+                  </Text>
                 </View>
               </View>
-            ) : (
-              <View style={styles.toplineSectionCard}>
-                <Text style={styles.emptyBody}>No Upcoming Sessions yet.</Text>
-              </View>
-            )}
-          </View>
-        </>
-
-        {/* Pending Requests */}
-        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Pending Requests</Text>
-        <View style={[styles.toplineSectionCard, { marginTop: 10 }]}>
-          {pendingRequests.length === 0 ? (
-            <Text style={styles.emptyBody}>No pending requests.</Text>
+            </View>
           ) : (
-            pendingRequests.slice(0, 2).map((r) => (
-              <View key={r.id} style={{ marginTop: 10 }}>
-                <Text style={styles.inputLabel}>
-                  {r.coachName || 'Coach'} • {r.date ? formatDayDateFromYYYYMMDD(String(r.date)) : '—'} •{' '}
-                  {r.slotStart}-{r.slotEnd}
-                </Text>
-                <Text style={styles.playerWelcomeSubText}>
-                  Status: {String(r.status).toUpperCase()}
-                </Text>
-              </View>
-            ))
+            <View style={styles.toplineSectionCard}>
+              <Text style={styles.emptyBody}>No Upcoming Sessions yet.</Text>
+            </View>
           )}
         </View>
 
-        {/* Recent Feedback */}
-        <>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Recent Feedback</Text>
+        {/* Pending Requests */}
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>⏳</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Session Requests</Text>
+            </View>
           </View>
+          <View style={styles.dashboardSectionDivider} />
 
-          <View style={styles.sectionBlock}>
-            {loadingFeedback ? (
-              <View style={styles.toplineSectionCard}>
-                <View style={styles.shimmerBox}>
-                  <Animated.View
-                    style={[styles.shimmerOverlay, { transform: [{ translateX: shimmerTranslateX }] }]}
-                  >
-                    <LinearGradient
-                      colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={{ flex: 1 }}
-                    />
-                  </Animated.View>
-                </View>
-                <View style={{ height: 12 }} />
-                <View style={[styles.shimmerBox, { height: 18, width: '70%' }]} />
-              </View>
-            ) : recentFeedback ? (
-              <View style={styles.toplineSectionCard}>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={styles.pillText}>🗓 {String(recentFeedback.createdAtLabel || '—')}</Text>
-                  </View>
-
-                  <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={styles.pillText}>🏏 {String(recentFeedback.skill || 'Practice')}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.divider} />
-
-                <View style={styles.titleRow}>
-                  <Text style={styles.bigTitle}>{recentFeedback.coachName || 'Coach'}</Text>
-                </View>
-
-                <Text style={styles.feedbackText}>{recentFeedback.feedback || '—'}</Text>
-              </View>
+          <View style={styles.toplineSectionCard}>
+            {pendingRequests.length === 0 ? (
+              <Text style={styles.emptyBody}>No pending requests.</Text>
             ) : (
-              <View style={styles.toplineSectionCard}>
-                <Text style={styles.emptyTitle}>No feedback yet</Text>
-                <Text style={styles.emptyBody}>
-                  Your coach’s notes will appear here once a video is reviewed or a coaching video is shared.
-                </Text>
-              </View>
+              pendingRequests.slice(0, 2).map((r) => {
+                const status = String(r.status || '').trim().toLowerCase();
+                const statusStyle =
+                  status === 'requested' ? styles.statusBadgeRequested :
+                  status === 'accepted' ? styles.statusBadgeAccepted :
+                  status === 'declined' ? styles.statusBadgeDeclined :
+                  status === 'countered' ? styles.statusBadgeCountered :
+                  styles.statusBadgeDefault;
+                const darkText = status === 'requested';
+
+                return (
+                  <View key={r.id} style={[styles.requestItemCard, { marginTop: 10 }]}>
+                    <Text style={styles.inputLabel}>
+                      {(r.coachName || 'Coach')}    • {r.date ? formatDayDateFromYYYYMMDD(String(r.date)) : '—'} •{' '}
+                      {r.slotStart}-{r.slotEnd}
+                    </Text>
+                    <View style={[styles.statusBadge, styles.requestStatusBadge, statusStyle]}>
+                      <Text style={[styles.statusBadgeText, darkText ? styles.statusBadgeTextDark : null]}>
+                        {String(r.status || 'status').toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
             )}
           </View>
-        </>
+        </View>
+
+        {/* Recent Feedback */}
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>💬</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Recent Feedback</Text>
+            </View>
+          </View>
+          <View style={styles.dashboardSectionDivider} />
+
+          {loadingFeedback ? (
+            <View style={styles.toplineSectionCard}>
+              <View style={styles.shimmerBox}>
+                <Animated.View
+                  style={[styles.shimmerOverlay, { transform: [{ translateX: shimmerTranslateX }] }]}
+                >
+                  <LinearGradient
+                    colors={['transparent', 'rgba(255,255,255,0.55)', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ flex: 1 }}
+                  />
+                </Animated.View>
+              </View>
+              <View style={{ height: 12 }} />
+              <View style={[styles.shimmerBox, { height: 18, width: '70%' }]} />
+            </View>
+          ) : recentFeedback ? (
+            <View style={styles.toplineSectionCard}>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={[styles.playerPill, styles.playerPillTall, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={styles.playerPillTextSm} numberOfLines={2}>
+                    🗓 {String(recentFeedback.createdAtLabel || '—')}
+                  </Text>
+                </View>
+
+                <View style={[styles.playerPill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={styles.playerPillText} numberOfLines={1}>
+                    🏏 {String(recentFeedback.skill || 'Practice')}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.titleRow}>
+                <Text style={styles.bigTitle}>{recentFeedback.coachName || 'Coach'}</Text>
+              </View>
+
+              <Text style={styles.feedbackText}>{recentFeedback.feedback || '—'}</Text>
+            </View>
+          ) : (
+            <View style={styles.toplineSectionCard}>
+              <Text style={styles.emptyTitle}>No feedback yet</Text>
+              <Text style={styles.emptyBody}>
+                Your coach’s notes will appear here once a video is reviewed or a coaching video is shared.
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* Quick Actions */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.quickActionsCard}>
-          <TouchableOpacity
-            style={styles.quickActionTile}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('PlayerVideos')}
-          >
-            <View style={styles.quickActionIconWrap}>
-              <Text style={styles.quickActionEmoji}>🎥</Text>
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>⚡</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Quick Actions</Text>
             </View>
-            <Text style={styles.quickActionText} numberOfLines={2}>
-              My Practice Videos
-            </Text>
-          </TouchableOpacity>
+          </View>
+          <View style={styles.dashboardSectionDivider} />
 
-          <TouchableOpacity
-            style={styles.quickActionTile}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('PlayerCoachingVideos')}
-          >
-            <View style={styles.quickActionIconWrap}>
-              <Text style={styles.quickActionEmoji}>📺</Text>
-            </View>
-            <Text style={styles.quickActionText} numberOfLines={2}>
-              Coaching Videos
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.quickActionsCard}>
+            <TouchableOpacity
+              style={styles.quickActionTile}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('PlayerVideos')}
+            >
+              <View style={styles.quickActionIconWrap}>
+                <Text style={styles.playerQuickActionEmoji}>🎥</Text>
+              </View>
+              <Text style={styles.quickActionText} numberOfLines={2}>
+                My Practice Videos
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.quickActionTile}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('PlayerFitness')}
-          >
-            <View style={styles.quickActionIconWrap}>
-              <Text style={styles.quickActionEmoji}>🏋️</Text>
-            </View>
-            <Text style={styles.quickActionText} numberOfLines={2}>
-              Fitness
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickActionTile}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('PlayerCoachingVideos')}
+            >
+              <View style={styles.quickActionIconWrap}>
+                <Text style={styles.playerQuickActionEmoji}>📺</Text>
+              </View>
+              <Text style={styles.quickActionText} numberOfLines={2}>
+                Coaching Videos
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.quickActionTile}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('PlayerBookSessions')}
-          >
-            <View style={styles.quickActionIconWrap}>
-              <Text style={styles.quickActionEmoji}>📅</Text>
-            </View>
-            <Text style={styles.quickActionText} numberOfLines={2}>
-              Session Booking
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickActionTile}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('PlayerFitness')}
+            >
+              <View style={styles.quickActionIconWrap}>
+                <Text style={styles.playerQuickActionEmoji}>🏋️</Text>
+              </View>
+              <Text style={styles.quickActionText} numberOfLines={2}>
+                Fitness
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionTile}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('PlayerBookSessions')}
+            >
+              <View style={styles.quickActionIconWrap}>
+                <Text style={styles.playerQuickActionEmoji}>📅</Text>
+              </View>
+              <Text style={styles.quickActionText} numberOfLines={2}>
+                Session Booking
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Stats (unchanged) */}
-        <Text style={styles.sectionTitle}>Stats</Text>
-        <View style={styles.card}>
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>🧰</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Player Profile</Text>
+            </View>
+          </View>
+          <View style={styles.dashboardSectionDivider} />
+
+          <View style={styles.card}>
+            <View style={styles.statsHeaderRow}>
+              <Text style={styles.statsCardTitle}>Equipment & Bio</Text>
+              <TouchableOpacity onPress={openProfileEditor} activeOpacity={0.8}>
+                <Text style={styles.editLink}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.statsTable}>
+              <View style={styles.statsRow}>
+                <Text style={styles.statsLabel}>Height</Text>
+                <Text style={styles.statsValue}>{heightCm ? `${heightCm} cm` : '—'}</Text>
+              </View>
+              <View style={styles.statsRow}>
+                <Text style={styles.statsLabel}>Weight</Text>
+                <Text style={styles.statsValue}>{weightKg ? `${weightKg} kg` : '—'}</Text>
+              </View>
+              <View style={styles.statsRow}>
+                <Text style={styles.statsLabel}>Bat Size</Text>
+                <Text style={styles.statsValue}>{batSize || '—'}</Text>
+              </View>
+              <View style={styles.statsRow}>
+                <Text style={styles.statsLabel}>Bat Weight</Text>
+                <Text style={styles.statsValue}>{batWeight || '—'}</Text>
+              </View>
+              <View style={styles.statsRow}>
+                <Text style={styles.statsLabel}>Batting Hand</Text>
+                <Text style={styles.statsValue}>{battingHand ? battingHand.toUpperCase() : '—'}</Text>
+              </View>
+              <View style={styles.statsRow}>
+                <Text style={styles.statsLabel}>Bowling Hand</Text>
+                <Text style={styles.statsValue}>{bowlingHand ? bowlingHand.toUpperCase() : '—'}</Text>
+              </View>
+              <View style={[styles.statsRow, styles.statsRowLast]}>
+                <Text style={styles.statsLabel}>Pads Size</Text>
+                <Text style={styles.statsValue}>{padsSize || '—'}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>📊</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Stats</Text>
+            </View>
+          </View>
+          <View style={styles.dashboardSectionDivider} />
+
+          <View style={styles.card}>
           <View style={styles.statsHeaderRow}>
             <Text style={styles.statsCardTitle}>Season Stats</Text>
 
@@ -682,6 +857,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
               <Text style={styles.statsButtonText}>Add key stats manually</Text>
             </TouchableOpacity>
           )}
+          </View>
         </View>
 
         {/* Stats Modal (unchanged) */}
@@ -770,6 +946,114 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
                 <TouchableOpacity
                   style={[styles.modalBtn, styles.modalBtnPrimary]}
                   onPress={saveStats}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.modalBtnPrimaryText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Player Profile Modal */}
+        <Modal visible={profileModalVisible} transparent animationType="fade">
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Update Profile</Text>
+
+              <View style={styles.modalRow}>
+                <View style={styles.modalField}>
+                  <Text style={styles.modalLabel}>Height (cm)</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={heightCm}
+                    onChangeText={setHeightCm}
+                    keyboardType="number-pad"
+                    placeholder="e.g. 170"
+                  />
+                </View>
+                <View style={styles.modalField}>
+                  <Text style={styles.modalLabel}>Weight (kg)</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={weightKg}
+                    onChangeText={setWeightKg}
+                    keyboardType="number-pad"
+                    placeholder="e.g. 65"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalRow}>
+                <View style={styles.modalField}>
+                  <Text style={styles.modalLabel}>Bat Size</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={batSize}
+                    onChangeText={setBatSize}
+                    placeholder="e.g. SH / Harrow"
+                  />
+                </View>
+                <View style={styles.modalField}>
+                  <Text style={styles.modalLabel}>Bat Weight</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={batWeight}
+                    onChangeText={setBatWeight}
+                    placeholder="e.g. 2lb 8oz"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalRow}>
+                <View style={styles.modalField}>
+                  <Text style={styles.modalLabel}>Batting Hand</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={battingHand}
+                    onChangeText={setBattingHand}
+                    placeholder="RH / LH"
+                    autoCapitalize="characters"
+                    maxLength={2}
+                  />
+                </View>
+                <View style={styles.modalField}>
+                  <Text style={styles.modalLabel}>Bowling Hand</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={bowlingHand}
+                    onChangeText={setBowlingHand}
+                    placeholder="RH / LH"
+                    autoCapitalize="characters"
+                    maxLength={2}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalRow}>
+                <View style={styles.modalField}>
+                  <Text style={styles.modalLabel}>Pads Size</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={padsSize}
+                    onChangeText={setPadsSize}
+                    placeholder="e.g. Youth / Adult"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalButtonsRow}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalBtnSecondary]}
+                  onPress={() => setProfileModalVisible(false)}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.modalBtnSecondaryText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalBtnPrimary]}
+                  onPress={saveProfileDetails}
                   activeOpacity={0.9}
                 >
                   <Text style={styles.modalBtnPrimaryText}>Save</Text>

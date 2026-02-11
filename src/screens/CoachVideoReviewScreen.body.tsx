@@ -25,6 +25,7 @@ import { db, storage, serverTimestamp } from '../firebase';
 import { styles } from '../styles/styles';
 import { formatDayDate } from '../utils/dateFormatter';
 import { fetchPlayersAndParents } from "../utils/publicUsers";
+import { askAI } from '../services/askAI';
 
 import {
   collection,
@@ -114,8 +115,20 @@ const CoachVideoReviewScreenBody: React.FC<any> = ({ navigation }: any) => {
   // ✅ NEW: coach consent checkbox (reuse pattern)
   const [coachAcceptedPolicy, setCoachAcceptedPolicy] = useState(false);
 
+  // Ask AI (coach)
+  const [askVisible, setAskVisible] = useState(false);
+  const [askQuestion, setAskQuestion] = useState('');
+  const [askAnswer, setAskAnswer] = useState('');
+  const [askLoading, setAskLoading] = useState(false);
+  const [askVideoId, setAskVideoId] = useState('');
+
   const playerNameById = (playerId: string) =>
     players.find((p) => p.id === playerId)?.name ?? '';
+
+  const reviewOptions = useMemo(
+    () => forReview.map((v) => ({ id: v.id, label: v.playerName || 'Player' })),
+    [forReview]
+  );
 
   // Listen: videos assigned to this coach (player uploads)
   useEffect(() => {
@@ -187,6 +200,47 @@ const CoachVideoReviewScreenBody: React.FC<any> = ({ navigation }: any) => {
   const closeReview = () => {
     setSelected(null);
     setDraftFeedback('');
+  };
+
+  const openAskAI = () => {
+    if (forReview.length === 0) {
+      Alert.alert('No videos', 'There are no player videos to review yet.');
+      return;
+    }
+    const defaultId = selected?.id || forReview[0]?.id || '';
+    setAskVideoId(defaultId);
+    setAskQuestion('');
+    setAskAnswer('');
+    setAskVisible(true);
+  };
+
+  const closeAskAI = () => setAskVisible(false);
+
+  const submitAskAI = async () => {
+    if (askLoading) return;
+    const q = askQuestion.trim();
+    if (!q) {
+      Alert.alert('Type a question', 'Please enter a question for the AI.');
+      return;
+    }
+    if (!askVideoId) {
+      Alert.alert('Select a player', 'Please select a player video to ask about.');
+      return;
+    }
+    try {
+      setAskLoading(true);
+      const res = await askAI(q, { videoId: askVideoId });
+      setAskAnswer(res.answer || '');
+    } catch (e: any) {
+      const code = String(e?.code || '');
+      if (code.includes('resource-exhausted')) {
+        Alert.alert('Limit reached', 'You have used your 5 free questions for this month.');
+      } else {
+        Alert.alert('Ask AI failed', e?.message || 'Please try again.');
+      }
+    } finally {
+      setAskLoading(false);
+    }
   };
 
   const saveFeedback = async () => {
@@ -391,7 +445,7 @@ useEffect(() => {
 
   return (
     <SafeAreaView style={styles.screenContainer}>
-      <ScrollView contentContainerStyle={styles.formScroll}>
+      <ScrollView contentContainerStyle={[styles.formScroll, { paddingBottom: 120 }]}>
        <View style={styles.coachPremiumHeaderCard}>
   <View style={styles.coachPremiumHeaderRow}>
     <View style={{ flex: 1, paddingRight: 10 }}>
@@ -414,9 +468,17 @@ useEffect(() => {
         />
 
         {tab === 'review' ? (
-          <>
-            {/* 1) FOR REVIEW */}
-            <Text style={styles.playerCardSubtitle}>For Review</Text>
+          <View style={styles.dashboardSectionWrap}>
+            <View style={styles.dashboardSectionHeader}>
+              <View style={styles.dashboardSectionHeaderLeft}>
+                <View style={styles.dashboardSectionIconWrap}>
+                  <Text style={styles.dashboardSectionIcon}>🎥</Text>
+                </View>
+                <Text style={styles.dashboardSectionTitle}>For Review</Text>
+              </View>
+            </View>
+            <View style={styles.dashboardSectionDivider} />
+
             <Text style={styles.playerWelcomeSubText}>
               Videos submitted by players will appear here. Tap a card to review and save feedback.
             </Text>
@@ -426,56 +488,66 @@ useEffect(() => {
             ) : forReview.length === 0 ? (
               <Text style={styles.playerCardEmptyText}>No videos to review yet.</Text>
             ) : (
-              forReview.map((v) => {
-                const isDone = !!v.reviewed || v.status === 'reviewed';
-                return (
-                  <TouchableOpacity
-                    key={v.id}
-                    style={styles.coachVideoCard}
-                    onPress={() => openReview(v)}
-                  >
-                    <View style={styles.videoCardRow}>
-                      <View>
-                        <Text style={styles.videoCardName}>{v.playerName || 'Player'}</Text>
-                        <Text style={styles.videoCardMeta}>
-                          {v.createdAtLabel || '—'} • {isDone ? 'Reviewed' : 'Pending'}
-                        </Text>
-                      </View>
+              <View style={{ marginTop: 10 }}>
+                {forReview.map((v) => {
+                  const isDone = !!v.reviewed || v.status === 'reviewed';
+                  return (
+                    <TouchableOpacity
+                      key={v.id}
+                      style={styles.coachVideoCard}
+                      onPress={() => openReview(v)}
+                    >
+                      <View style={styles.videoCardRow}>
+                        <View>
+                          <Text style={styles.videoCardName}>{v.playerName || 'Player'}</Text>
+                          <Text style={styles.videoCardMeta}>
+                            {v.createdAtLabel || '—'} • {isDone ? 'Reviewed' : 'Pending'}
+                          </Text>
+                        </View>
 
-                      <View
-                        style={[
-                          styles.coachStatusPill,
-                          isDone ? styles.coachStatusPillDone : styles.coachStatusPillPending,
-                        ]}
-                      >
-                        <Text
+                        <View
                           style={[
-                            styles.coachStatusText,
-                            isDone ? styles.coachStatusTextDone : styles.coachStatusTextPending,
+                            styles.coachStatusPill,
+                            isDone ? styles.coachStatusPillDone : styles.coachStatusPillPending,
                           ]}
                         >
-                          {isDone ? 'Reviewed' : 'Pending'}
-                        </Text>
+                          <Text
+                            style={[
+                              styles.coachStatusText,
+                              isDone ? styles.coachStatusTextDone : styles.coachStatusTextPending,
+                            ]}
+                          >
+                            {isDone ? 'Reviewed' : 'Pending'}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
 
-                    <Text style={styles.coachVideoCTA}>Tap to {isDone ? 'view' : 'review'} →</Text>
-                  </TouchableOpacity>
-                );
-              })
+                      <Text style={styles.coachVideoCTA}>Tap to {isDone ? 'view' : 'review'} →</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             )}
-          </>
+          </View>
         ) : null}
 
         {tab === 'share' ? (
-          <>
-            {/* 2) SHARE TO PLAYER */}
-            <View style={{ marginTop: 18 }}>
-              <Text style={styles.cardSubtitle}>Share Video to Player</Text>
-              <Text style={styles.playerWelcomeSubText}>
-                Upload a short coaching clip (max 2 mins) and share it with a registered player.
-              </Text>
+          <View style={styles.dashboardSectionWrap}>
+            <View style={styles.dashboardSectionHeader}>
+              <View style={styles.dashboardSectionHeaderLeft}>
+                <View style={styles.dashboardSectionIconWrap}>
+                  <Text style={styles.dashboardSectionIcon}>📤</Text>
+                </View>
+                <Text style={styles.dashboardSectionTitle}>Upload for Player</Text>
+              </View>
+            </View>
+            <View style={styles.dashboardSectionDivider} />
 
+            <Text style={styles.playerWelcomeSubText}>
+              Upload a short coaching clip (max 2 mins) and share it with a registered player.
+            </Text>
+
+            <View style={{ marginTop: 12 }}>
               <Text style={styles.coachAssignLabel}>Select player</Text>
               <View style={styles.pickerCard}>
                 <Picker
@@ -548,8 +620,81 @@ useEffect(() => {
                 </Text>
               </TouchableOpacity>
             </View>
-          </>
+          </View>
         ) : null}
+
+        {/* Ask AI Modal */}
+        <Modal visible={askVisible} transparent animationType="fade" onRequestClose={closeAskAI}>
+            <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Ask AI</Text>
+              <Text style={styles.modalHintText}>
+                How to ask: goal + context + timeframe. Example: “Player struggles with front‑foot timing; drills for 2 weeks?”
+              </Text>
+
+              {reviewOptions.length > 0 ? (
+                <>
+                  <Text style={styles.modalHintText}>Select a player video for context.</Text>
+                  <View style={styles.pickerCard}>
+                    <Picker
+                      selectedValue={askVideoId}
+                      onValueChange={(value) => setAskVideoId(String(value))}
+                    >
+                      {reviewOptions.map((opt) => (
+                        <Picker.Item key={opt.id} label={opt.label} value={opt.id} />
+                      ))}
+                    </Picker>
+                  </View>
+                </>
+              ) : null}
+
+              <TextInput
+                style={styles.modalTextArea}
+                placeholder="Ask a question about the player’s training…"
+                value={askQuestion}
+                onChangeText={setAskQuestion}
+                multiline
+              />
+
+              {askAnswer ? (
+                <View style={styles.modalScrollBox}>
+                  <Text style={styles.modalBodyText}>{askAnswer}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.modalButtonsRow}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalBtnSecondary]}
+                  onPress={closeAskAI}
+                >
+                  <Text style={styles.modalBtnSecondaryText}>Close</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalBtn,
+                    styles.modalBtnPrimary,
+                    askLoading ? { opacity: 0.6 } : null,
+                  ]}
+                  onPress={submitAskAI}
+                  disabled={askLoading}
+                >
+                  <Text style={styles.modalBtnPrimaryText}>
+                    {askLoading ? 'Asking…' : 'Ask AI'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        <TouchableOpacity style={styles.aiCoachFab} onPress={openAskAI} activeOpacity={0.9}>
+          <View style={styles.aiCoachBubble}>
+            <Text style={styles.aiCoachIcon}>🤖</Text>
+          </View>
+          <View style={styles.aiCoachLabel}>
+            <Text style={styles.aiCoachLabelText}>Topline AI Coach</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Return */}
         <View style={{ marginTop: 18, marginBottom: 30 }}>

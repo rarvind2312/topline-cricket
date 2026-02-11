@@ -27,6 +27,13 @@ export type User = {
   dob?:string;
   playerType?: string;
   playerLevel?:string
+  heightCm?: string;
+  weightKg?: string;
+  battingHand?: string;
+  bowlingHand?: string;
+  batSize?:string;
+  batWeight?:string;
+  padsSize?:string;
   playCricketUrl?: string;
   consents?: {
     videoPrivacyAccepted: true;

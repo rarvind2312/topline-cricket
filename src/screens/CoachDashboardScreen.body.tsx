@@ -21,9 +21,9 @@ import {
   collection,
   limit,
   onSnapshot,
-  orderBy,
   query,
   where,
+  orderBy
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -42,6 +42,7 @@ type Session = {
   start?: string; // "09:00"
   end?: string; // "10:00"
   status?: string; // "upcoming"
+  requestId?: string;
 
   createdAtMs?: number;
   createdAtLabel?: string;
@@ -63,6 +64,8 @@ type BookingRequest = {
   slotStart?: string;
   slotEnd?: string;
   createdAtMs?: number;
+  updatedAtMs?: number;
+  status?: string;
 };
 
 function toLocalDateKey(d: Date) {
@@ -138,9 +141,21 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
       sessionsQ,
       (snap) => {
         const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as Session[];
-        rows.sort((a, b) => String(a.start || '').localeCompare(String(b.start || '')));
-        setSessionsToday(rows.length);
-        setTodaySessionsList(rows);
+        const seen = new Set<string>();
+        const unique = rows.filter((r) => {
+          const slotKey =
+            r.requestId
+              ? `req_${r.requestId}`
+              : r.playerId || r.date || r.start || r.end
+                ? `slot_${r.playerId || ''}_${r.date || ''}_${r.start || ''}_${r.end || ''}`
+                : `id_${r.id}`;
+          if (seen.has(slotKey)) return false;
+          seen.add(slotKey);
+          return true;
+        });
+        unique.sort((a, b) => String(a.start || '').localeCompare(String(b.start || '')));
+        setSessionsToday(unique.length);
+        setTodaySessionsList(unique);
       },
       (err) => {
         console.log('CoachDashboard sessions listener error:', err);
@@ -252,9 +267,7 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
     const reqQ = query(
       collection(db, 'sessionRequests'),
       where('coachId', '==', uid),
-      where('status', '==', 'requested'),
-      orderBy('createdAtMs', 'desc'),
-      limit(1)
+      limit(200)
     );
 
     const unsub = onSnapshot(
@@ -264,8 +277,14 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
           setLatestRequest(null);
           return;
         }
-        const d = snap.docs[0];
-        setLatestRequest({ id: d.id, ...(d.data() as any) });
+        const rows = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as BookingRequest[];
+        const requested = rows.filter(r => String(r.status || '').trim().toLowerCase() === 'requested');
+        requested.sort((a, b) => {
+          const aMs = Number(a.createdAtMs || a.updatedAtMs || 0);
+          const bMs = Number(b.createdAtMs || b.updatedAtMs || 0);
+          return bMs - aMs;
+        });
+        setLatestRequest(requested[0] ?? null);
       },
       (err) => {
         console.log('CoachDashboard booking request listener error:', err);
@@ -300,11 +319,17 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {/* Upcoming Sessions (today) */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.coachSectionTitle}>Upcoming sessions</Text>
-        </View>
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>🗓️</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Upcoming Sessions</Text>
+            </View>
+          </View>
+          <View style={styles.dashboardSectionDivider} />
 
-        <View style={styles.sectionBlock}>
           {todaySessionsList.length === 0 ? (
             <View style={styles.toplineSectionCard}>
               <Text style={styles.emptyBody}>No sessions scheduled for today yet.</Text>
@@ -346,11 +371,17 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {/* Booking Requests (latest only) */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.coachSectionTitle}>Booking Requests</Text>
-        </View>
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>📥</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Booking Requests</Text>
+            </View>
+          </View>
+          <View style={styles.dashboardSectionDivider} />
 
-        <View style={styles.sectionBlock}>
           {latestRequest ? (
             <View style={styles.toplineSectionCard}>
               <View style={styles.titleRow}>
@@ -390,11 +421,17 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {/* Reviews Requested */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.coachSectionTitle}>Reviews Requested</Text>
-        </View>
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>✅</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Reviews Requested</Text>
+            </View>
+          </View>
+          <View style={styles.dashboardSectionDivider} />
 
-        <View style={styles.sectionBlock}>
           {reviewItems.length === 0 ? (
             <View style={styles.toplineSectionCard}>
               <Text style={styles.emptyTitle}>No pending reviews</Text>
@@ -432,62 +469,70 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
         </View>
 
         {/* Quick Actions (match player tile style) */}
-        <Text style={styles.coachSectionTitle}>Quick Actions</Text>
-        <View style={styles.quickActionsCard}>
-          <TouchableOpacity
-            style={styles.quickActionTile}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('CoachVideoReview')}
-          >
-            <View style={styles.quickActionIconWrap}>
-              <Text style={styles.quickActionEmoji}>🎥</Text>
+        <View style={styles.dashboardSectionWrap}>
+          <View style={styles.dashboardSectionHeader}>
+            <View style={styles.dashboardSectionHeaderLeft}>
+              <View style={styles.dashboardSectionIconWrap}>
+                <Text style={styles.dashboardSectionIcon}>⚡</Text>
+              </View>
+              <Text style={styles.dashboardSectionTitle}>Quick Actions</Text>
             </View>
-            <Text style={styles.quickActionText} numberOfLines={2}>
-              Review Videos
-            </Text>
-          </TouchableOpacity>
+          </View>
+          <View style={styles.dashboardSectionDivider} />
 
-          <TouchableOpacity
-            style={styles.quickActionTile}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('CoachFitness')}
-          >
-            <View style={styles.quickActionIconWrap}>
-              <Text style={styles.quickActionEmoji}>🏋️</Text>
-            </View>
-            <Text style={styles.quickActionText} numberOfLines={2}>
-              Review Fitness
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.quickActionsCard}>
+            <TouchableOpacity
+              style={styles.quickActionTile}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('CoachVideoReview')}
+            >
+              <View style={styles.quickActionIconWrap}>
+                <Text style={styles.quickActionEmoji}>🎥</Text>
+              </View>
+              <Text style={styles.quickActionText} numberOfLines={2}>
+                Review Videos
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.quickActionTile}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('CoachAvailability')}
-          >
-            <View style={styles.quickActionIconWrap}>
-              <Text style={styles.quickActionEmoji}>📅</Text>
-            </View>
-            <Text style={styles.quickActionText} numberOfLines={2}>
-              Availability
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickActionTile}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('CoachFitness')}
+            >
+              <View style={styles.quickActionIconWrap}>
+                <Text style={styles.quickActionEmoji}>🏋️</Text>
+              </View>
+              <Text style={styles.quickActionText} numberOfLines={2}>
+                Review Fitness
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.quickActionTile}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('CoachBookingRequests')}
-          >
-            <View style={styles.quickActionIconWrap}>
-              <Text style={styles.quickActionEmoji}>📥</Text>
-            </View>
-            <Text style={styles.quickActionText} numberOfLines={2}>
-              Booking Requests
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickActionTile}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('CoachAvailability')}
+            >
+              <View style={styles.quickActionIconWrap}>
+                <Text style={styles.quickActionEmoji}>📅</Text>
+              </View>
+              <Text style={styles.quickActionText} numberOfLines={2}>
+                Availability
+              </Text>
+            </TouchableOpacity>
 
-          {/* Premium footer line */}
-          
+            <TouchableOpacity
+              style={styles.quickActionTile}
+              activeOpacity={0.9}
+              onPress={() => navigation.navigate('CoachBookingRequests')}
+            >
+              <View style={styles.quickActionIconWrap}>
+                <Text style={styles.quickActionEmoji}>📥</Text>
+              </View>
+              <Text style={styles.quickActionText} numberOfLines={2}>
+                Booking Requests
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>

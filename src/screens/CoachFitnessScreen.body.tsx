@@ -405,8 +405,16 @@ useEffect(() => {
           />
 
           {tab === 'review' ? (
-            <>
-              <Text style={styles.coachFitnessSectionTitle}>From Players</Text>
+            <View style={styles.dashboardSectionWrap}>
+              <View style={styles.dashboardSectionHeader}>
+                <View style={styles.dashboardSectionHeaderLeft}>
+                  <View style={styles.dashboardSectionIconWrap}>
+                    <Text style={styles.dashboardSectionIcon}>🧾</Text>
+                  </View>
+                  <Text style={styles.dashboardSectionTitle}>From Players</Text>
+                </View>
+              </View>
+              <View style={styles.dashboardSectionDivider} />
 
               <View style={styles.coachFitnessCard}>
                 <View style={styles.coachFitnessCardHeaderRow}>
@@ -452,31 +460,39 @@ useEffect(() => {
                   ))
                 )}
               </View>
-            </>
+            </View>
           ) : null}
 
           {tab === 'assign' ? (
             <>
-              <Text style={styles.coachFitnessSectionTitle}>Assign a Drill</Text>
-
-              <View style={styles.coachFitnessCard}>
-                <View style={styles.coachFitnessCardHeaderRow}>
-                  <Text style={styles.coachFitnessCardTitle}>Player Selection</Text>
+              <View style={styles.dashboardSectionWrap}>
+                <View style={styles.dashboardSectionHeader}>
+                  <View style={styles.dashboardSectionHeaderLeft}>
+                    <View style={styles.dashboardSectionIconWrap}>
+                      <Text style={styles.dashboardSectionIcon}>🏋️</Text>
+                    </View>
+                    <Text style={styles.dashboardSectionTitle}>Assign a Drill</Text>
+                  </View>
                 </View>
+                <View style={styles.dashboardSectionDivider} />
 
-        
-                <View style={styles.pickerCard}>
-                  <Picker
-                    enabled={!loadingPlayers}
-                    selectedValue={selectedPlayerId}
-                    onValueChange={value => setSelectedPlayerId(String(value))}
-                  >
-                    <Picker.Item label={loadingPlayers ? 'Loading players…' : 'Player'} value="" />
-                    {players.map(p => (
-                      <Picker.Item key={p.uid} label={p.name} value={p.uid} />
-                    ))}
-                  </Picker>
-                </View>
+                <View style={styles.coachFitnessCard}>
+                  <View style={styles.coachFitnessCardHeaderRow}>
+                    <Text style={styles.coachFitnessCardTitle}>Player Selection</Text>
+                  </View>
+
+                  <View style={styles.pickerCard}>
+                    <Picker
+                      enabled={!loadingPlayers}
+                      selectedValue={selectedPlayerId}
+                      onValueChange={value => setSelectedPlayerId(String(value))}
+                    >
+                      <Picker.Item label={loadingPlayers ? 'Loading players…' : 'Player'} value="" />
+                      {players.map(p => (
+                        <Picker.Item key={p.uid} label={p.name} value={p.uid} />
+                      ))}
+                    </Picker>
+                  </View>
 
                 {drills.map((d, idx) => (
                   <View key={idx} style={styles.coachFitnessDrillBlock}>
@@ -531,89 +547,100 @@ useEffect(() => {
                   <Text style={styles.secondaryButtonText}>+ Add more (up to {MAX_DRILLS})</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.primaryButton, { marginTop: 14 }]} onPress={assignToPlayer}>
-                  <Text style={styles.primaryButtonText}>Assign to Player</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity style={[styles.primaryButton, { marginTop: 14 }]} onPress={assignToPlayer}>
+                    <Text style={styles.primaryButtonText}>Assign to Player</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Tracker */}
-              <Text style={styles.coachFitnessSectionTitle}>Tracker</Text>
-
-              <View style={styles.coachFitnessCard}>
-                <View style={styles.coachFitnessCardHeaderRow}>
-                  <Text style={styles.coachFitnessCardTitle}>Assigned</Text>
-                  <View style={styles.coachFitnessBadge}>
-                    <Text style={styles.coachFitnessBadgeText}>{assignedEntries.length}</Text>
+              <View style={styles.dashboardSectionWrap}>
+                <View style={styles.dashboardSectionHeader}>
+                  <View style={styles.dashboardSectionHeaderLeft}>
+                    <View style={styles.dashboardSectionIconWrap}>
+                      <Text style={styles.dashboardSectionIcon}>📊</Text>
+                    </View>
+                    <Text style={styles.dashboardSectionTitle}>Tracker</Text>
                   </View>
                 </View>
-                {assignedEntries.length === 0 ? (
-                  <Text style={styles.coachFitnessEmptyText}>No fitness drills assigned yet.</Text>
-                ) : (
-                  assignedEntries.map(x => (
-                    <View key={x.id} style={styles.coachFitnessListItem}>
-                      <View style={styles.coachFitnessListHeaderRow}>
-                        <Text style={styles.coachFitnessListTitle}>{x.playerName || 'Player'}</Text>
-                        <View style={styles.coachFitnessPill}>
-                          <Text style={styles.coachFitnessPillText}>Assigned</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.coachFitnessListMeta}>
-                        Assigned {x.createdAtLabel || ''}
-                      </Text>
-                      {x.drills.slice(0, MAX_DRILLS).map((d, i) => (
-                        <View key={i} style={styles.coachFitnessBulletRow}>
-                          <Text style={styles.coachFitnessBulletDot}>•</Text>
-                          <Text style={styles.coachFitnessBulletText}>
-                            {d.drill}
-                            {d.reps ? ` — Reps: ${d.reps}` : ''}
-                            {d.sets ? `, Sets: ${d.sets}` : ''}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  ))
-                )}
-              </View>
+                <View style={styles.dashboardSectionDivider} />
 
-              <View style={[styles.coachFitnessCard, { marginTop: 14 }]}>
-                <View style={styles.coachFitnessCardHeaderRow}>
-                  <Text style={styles.coachFitnessCardTitle}>Completed</Text>
-                  <View style={[styles.coachFitnessBadge, styles.coachFitnessBadgeSuccess]}>
-                    <Text style={[styles.coachFitnessBadgeText, styles.coachFitnessBadgeSuccessText]}>
-                      {completedEntries.length}
-                    </Text>
-                  </View>
-                </View>
-                {completedEntries.length === 0 ? (
-                  <Text style={styles.coachFitnessEmptyText}>No completed drills yet.</Text>
-                ) : (
-                  completedEntries.map(x => (
-                    <View key={x.id} style={styles.coachFitnessListItem}>
-                      <View style={styles.coachFitnessListHeaderRow}>
-                        <Text style={styles.coachFitnessListTitle}>{x.playerName || 'Player'}</Text>
-                        <View style={[styles.coachFitnessPill, styles.coachFitnessPillSuccess]}>
-                          <Text style={[styles.coachFitnessPillText, styles.coachFitnessPillSuccessText]}>
-                            Completed
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.coachFitnessListMeta}>
-                        Completed {x.completedAtLabel || x.createdAtLabel || ''}
-                        {x.completedByPlayerName ? ` • by ${x.completedByPlayerName}` : ''}
-                      </Text>
-                      {x.drills.slice(0, MAX_DRILLS).map((d, i) => (
-                        <View key={i} style={styles.coachFitnessBulletRow}>
-                          <Text style={styles.coachFitnessBulletDot}>•</Text>
-                          <Text style={styles.coachFitnessBulletText}>
-                            {d.drill}
-                            {d.reps ? ` — Reps: ${d.reps}` : ''}
-                            {d.sets ? `, Sets: ${d.sets}` : ''}
-                          </Text>
-                        </View>
-                      ))}
+                <View style={styles.coachFitnessCard}>
+                  <View style={styles.coachFitnessCardHeaderRow}>
+                    <Text style={styles.coachFitnessCardTitle}>Assigned</Text>
+                    <View style={styles.coachFitnessBadge}>
+                      <Text style={styles.coachFitnessBadgeText}>{assignedEntries.length}</Text>
                     </View>
-                  ))
-                )}
+                  </View>
+                  {assignedEntries.length === 0 ? (
+                    <Text style={styles.coachFitnessEmptyText}>No fitness drills assigned yet.</Text>
+                  ) : (
+                    assignedEntries.map(x => (
+                      <View key={x.id} style={styles.coachFitnessListItem}>
+                        <View style={styles.coachFitnessListHeaderRow}>
+                          <Text style={styles.coachFitnessListTitle}>{x.playerName || 'Player'}</Text>
+                          <View style={styles.coachFitnessPill}>
+                            <Text style={styles.coachFitnessPillText}>Assigned</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.coachFitnessListMeta}>
+                          Assigned {x.createdAtLabel || ''}
+                        </Text>
+                        {x.drills.slice(0, MAX_DRILLS).map((d, i) => (
+                          <View key={i} style={styles.coachFitnessBulletRow}>
+                            <Text style={styles.coachFitnessBulletDot}>•</Text>
+                            <Text style={styles.coachFitnessBulletText}>
+                              {d.drill}
+                              {d.reps ? ` — Reps: ${d.reps}` : ''}
+                              {d.sets ? `, Sets: ${d.sets}` : ''}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ))
+                  )}
+                </View>
+
+                <View style={[styles.coachFitnessCard, { marginTop: 14 }]}>
+                  <View style={styles.coachFitnessCardHeaderRow}>
+                    <Text style={styles.coachFitnessCardTitle}>Completed</Text>
+                    <View style={[styles.coachFitnessBadge, styles.coachFitnessBadgeSuccess]}>
+                      <Text style={[styles.coachFitnessBadgeText, styles.coachFitnessBadgeSuccessText]}>
+                        {completedEntries.length}
+                      </Text>
+                    </View>
+                  </View>
+                  {completedEntries.length === 0 ? (
+                    <Text style={styles.coachFitnessEmptyText}>No completed drills yet.</Text>
+                  ) : (
+                    completedEntries.map(x => (
+                      <View key={x.id} style={styles.coachFitnessListItem}>
+                        <View style={styles.coachFitnessListHeaderRow}>
+                          <Text style={styles.coachFitnessListTitle}>{x.playerName || 'Player'}</Text>
+                          <View style={[styles.coachFitnessPill, styles.coachFitnessPillSuccess]}>
+                            <Text style={[styles.coachFitnessPillText, styles.coachFitnessPillSuccessText]}>
+                              Completed
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.coachFitnessListMeta}>
+                          Completed {x.completedAtLabel || x.createdAtLabel || ''}
+                          {x.completedByPlayerName ? ` • by ${x.completedByPlayerName}` : ''}
+                        </Text>
+                        {x.drills.slice(0, MAX_DRILLS).map((d, i) => (
+                          <View key={i} style={styles.coachFitnessBulletRow}>
+                            <Text style={styles.coachFitnessBulletDot}>•</Text>
+                            <Text style={styles.coachFitnessBulletText}>
+                              {d.drill}
+                              {d.reps ? ` — Reps: ${d.reps}` : ''}
+                              {d.sets ? `, Sets: ${d.sets}` : ''}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ))
+                  )}
+                </View>
               </View>
             </>
           ) : null}
