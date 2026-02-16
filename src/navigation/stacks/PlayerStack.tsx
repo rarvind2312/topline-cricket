@@ -5,7 +5,7 @@ import type { RootStackParamList } from '../../types';
 import PlayerDashboardScreen from '../../screens/PlayerDashboardScreen';
 import PlayerVideosScreen from '../../screens/PlayerVideosScreen';
 import PlayerFitnessScreen from '../../screens/PlayerFitnessScreen';
-import PlayerBookSessions from '../../screens/PlayerBookSessions';
+import PlayerBookLanesScreen from '../../screens/PlayerBookLanesScreen';
 import PlayerBookSessionScreenBody from '../../screens/PlayerBookSessions.body';
 import PlayerCoachingVideosScreenBody from '../../screens/PlayerCoachingVideosScreen.body';
 
@@ -18,6 +18,7 @@ export default function PlayerStack() {
       <Stack.Screen name="PlayerVideos" component={PlayerVideosScreen} />
       <Stack.Screen name="PlayerFitness" component={PlayerFitnessScreen} />
           <Stack.Screen name="PlayerBookSessions" component={PlayerBookSessionScreenBody} />
+          <Stack.Screen name="PlayerBookLanes" component={PlayerBookLanesScreen} />
           <Stack.Screen name="PlayerCoachingVideos" component={PlayerCoachingVideosScreenBody} />
     </Stack.Navigator>
   );

@@ -47,11 +47,16 @@ cd ..
 
 ## Environment setup (Firebase)
 
-This app expects Firebase config in `src/firebase.ts` and uses the Firebase project in `.firebaserc`.
-If you are using your own Firebase project:
+Firebase client config is loaded from `.env` via `app.config.js`.
 
-1. Update `.firebaserc` with your project id.
-2. Update Firebase config in `src/firebase.ts`.
+1. Copy the template:
+   ```bash
+   cp .env.example .env
+   ```
+2. Fill in values from your Firebase project settings.
+3. (Optional) If you use a different Firebase project, update `.firebaserc`.
+
+After changing `.env`, restart Expo (`npm run start`) so the new config is picked up.
 
 Cloud Functions require Node 20 (see `functions/package.json`).
 
@@ -134,4 +139,3 @@ From `functions/`:
 - `npm run build` → Build Cloud Functions
 - `npm run serve` → Run emulator
 - `npm run deploy` → Deploy functions
-

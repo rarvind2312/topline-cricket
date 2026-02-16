@@ -37,12 +37,15 @@ type Session = {
   playerName?: string;
   coachId?: string;
   coachName?: string;
+  laneName?: string;
+  source?: 'session' | 'lane';
 
   date?: string; // YYYY-MM-DD (local)
   start?: string; // "09:00"
   end?: string; // "10:00"
   status?: string; // "upcoming"
   requestId?: string;
+  startAtMs?: number | null;
 
   createdAtMs?: number;
   createdAtLabel?: string;
@@ -91,6 +94,16 @@ function parseYYYYMMDDLocal(s?: string): Date | null {
   return Number.isNaN(dt.getTime()) ? null : dt;
 }
 
+function parseSessionStartLocalMs(dateStr?: string, startHHMM?: string): number | null {
+  if (!dateStr || !startHHMM) return null;
+  const [y, mo, da] = dateStr.split('-').map(Number);
+  const [h, mi] = startHHMM.split(':').map(Number);
+  if (!y || !mo || !da || Number.isNaN(h) || Number.isNaN(mi)) return null;
+  const d = new Date(y, mo - 1, da, h, mi, 0, 0);
+  const ms = d.getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
 const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
   const { firebaseUser, user } = useAuth();
 
@@ -103,11 +116,11 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
 
   // Metrics
   const [totalPlayers, setTotalPlayers] = useState(0);
-  const [sessionsToday, setSessionsToday] = useState(0);
   const [pendingReviews, setPendingReviews] = useState(0);
 
   // Lists
   const [todaySessionsList, setTodaySessionsList] = useState<Session[]>([]);
+  const [laneBookingsTodayList, setLaneBookingsTodayList] = useState<Session[]>([]);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [latestRequest, setLatestRequest] = useState<BookingRequest | null>(null);
 
@@ -118,6 +131,19 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
     () => formatDayDate(parseYYYYMMDDLocal(todayKey) || new Date()),
     [todayKey]
   );
+
+  const combinedTodaySessions = useMemo(() => {
+    const merged = [...todaySessionsList, ...laneBookingsTodayList];
+    merged.sort((a, b) => {
+      const aMs = typeof a.startAtMs === 'number' ? a.startAtMs : 0;
+      const bMs = typeof b.startAtMs === 'number' ? b.startAtMs : 0;
+      if (aMs && bMs) return aMs - bMs;
+      return String(a.start || '').localeCompare(String(b.start || ''));
+    });
+    return merged;
+  }, [todaySessionsList, laneBookingsTodayList]);
+
+  const sessionsToday = combinedTodaySessions.length;
 
   const formatRequestDate = (dateKey?: string) => {
     const dt = parseYYYYMMDDLocal(dateKey);
@@ -140,6 +166,7 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
     const unsubSessions = onSnapshot(
       sessionsQ,
       (snap) => {
+        const nowMs = Date.now();
         const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as Session[];
         const seen = new Set<string>();
         const unique = rows.filter((r) => {
@@ -153,14 +180,80 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
           seen.add(slotKey);
           return true;
         });
-        unique.sort((a, b) => String(a.start || '').localeCompare(String(b.start || '')));
-        setSessionsToday(unique.length);
-        setTodaySessionsList(unique);
+        const withStart = unique
+          .map((r) => {
+            const startAtMs =
+              typeof r.startAtMs === 'number'
+                ? r.startAtMs
+                : parseSessionStartLocalMs(r.date, r.start);
+            return { ...r, startAtMs };
+          })
+          .filter((r) => (typeof r.startAtMs === 'number' ? r.startAtMs >= nowMs : true));
+
+        withStart.sort((a, b) => {
+          const aMs = typeof a.startAtMs === 'number' ? a.startAtMs : 0;
+          const bMs = typeof b.startAtMs === 'number' ? b.startAtMs : 0;
+          if (aMs && bMs) return aMs - bMs;
+          return String(a.start || '').localeCompare(String(b.start || ''));
+        });
+
+        setTodaySessionsList(withStart);
       },
       (err) => {
         console.log('CoachDashboard sessions listener error:', err);
-        setSessionsToday(0);
         setTodaySessionsList([]);
+      }
+    );
+
+    // -------------------------
+    // 1b) Today's lane bookings (coach-created, no sessionId)
+    // -------------------------
+    const laneBookingsQ = query(
+      collection(db, 'laneBookings'),
+      where('coachId', '==', uid),
+      where('date', '==', todayKey)
+    );
+
+    const unsubLaneBookings = onSnapshot(
+      laneBookingsQ,
+      (snap) => {
+        const nowMs = Date.now();
+        const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as any[];
+        const mapped = rows
+          .filter((b) => String(b.status || '').toLowerCase() !== 'cancelled')
+          .filter((b) => String(b.bookingType || '').toLowerCase() === 'coaching')
+          .filter((b) => !b.sessionId)
+          .map((b) => {
+            const startAtMs = parseSessionStartLocalMs(b.date, b.start);
+            return {
+              id: `lane_${b.id}`,
+              playerId: b.playerId,
+              playerName: b.playerName,
+              coachId: b.coachId,
+              coachName: b.coachName,
+              laneName: b.laneName,
+              date: b.date,
+              start: b.start,
+              end: b.end,
+              status: b.status,
+              startAtMs,
+              source: 'lane' as const,
+            } as Session;
+          })
+          .filter((r) => (typeof r.startAtMs === 'number' ? r.startAtMs >= nowMs : true));
+
+        mapped.sort((a, b) => {
+          const aMs = typeof a.startAtMs === 'number' ? a.startAtMs : 0;
+          const bMs = typeof b.startAtMs === 'number' ? b.startAtMs : 0;
+          if (aMs && bMs) return aMs - bMs;
+          return String(a.start || '').localeCompare(String(b.start || ''));
+        });
+
+        setLaneBookingsTodayList(mapped);
+      },
+      (err) => {
+        console.log('CoachDashboard lane bookings listener error:', err);
+        setLaneBookingsTodayList([]);
       }
     );
 
@@ -254,9 +347,10 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
     );
 
     return () => {
-      unsubSessions();
-      unsubVideos();
-      unsubFitness();
+      try { unsubSessions(); } catch {}
+      try { unsubLaneBookings(); } catch {}
+      try { unsubVideos(); } catch {}
+      try { unsubFitness(); } catch {}
     };
   }, [firebaseUser?.uid, todayKey, todayStartMs]);
 
@@ -330,7 +424,7 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
           </View>
           <View style={styles.dashboardSectionDivider} />
 
-          {todaySessionsList.length === 0 ? (
+          {combinedTodaySessions.length === 0 ? (
             <View style={styles.toplineSectionCard}>
               <Text style={styles.emptyBody}>No sessions scheduled for today yet.</Text>
             </View>
@@ -345,7 +439,7 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
 
               <View style={styles.divider} />
 
-              {todaySessionsList.slice(0, 4).map((s) => (
+              {combinedTodaySessions.slice(0, 4).map((s) => (
                 <View key={s.id} style={{ marginTop: 10 }}>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
                     <View style={[styles.pill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
@@ -361,9 +455,9 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
                 </View>
               ))}
 
-              {todaySessionsList.length > 4 ? (
+              {combinedTodaySessions.length > 4 ? (
                 <Text style={[styles.playerWelcomeSubText, { marginTop: 10 }]}>
-                  + {todaySessionsList.length - 4} more
+                  + {combinedTodaySessions.length - 4} more
                 </Text>
               ) : null}
             </View>
@@ -532,9 +626,19 @@ const CoachDashboardScreenBody: React.FC<Props> = ({ navigation }) => {
                 Booking Requests
               </Text>
             </TouchableOpacity>
+
           </View>
         </View>
       </ScrollView>
+
+      <TouchableOpacity
+        style={styles.floatingLaneButton}
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('CoachBookLanes')}
+      >
+        <Text style={styles.floatingLaneButtonIcon}>🛣️</Text>
+        <Text style={styles.floatingLaneButtonText}>Book Lane</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };

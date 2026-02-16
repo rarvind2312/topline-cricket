@@ -16,7 +16,10 @@ export async function createUserProfile(uid: string, user: User): Promise<void> 
   await upsertUserProfile(uid, user);
 }
 
-export async function updateUserProfile(uid: string, updates: Partial<User>): Promise<void> {
+export async function updateUserProfile(
+  uid: string,
+  updates: Partial<AppUserProfile>
+): Promise<void> {
   const ref = doc(db, USERS_COLLECTION, uid);
 
   await updateDoc(ref, {

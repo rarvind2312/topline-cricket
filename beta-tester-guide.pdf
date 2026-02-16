@@ -1,0 +1,320 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 3264 >>
+stream
+BT
+/F1 12 Tf
+48 720 Td
+(Topline Cricket Beta – Tester Guide \(Detailed\)) Tj
+1 0 0 1 0 0 Tm
+48 706 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 692 Td
+(Access \(Expo Go\)) Tj
+1 0 0 1 0 0 Tm
+48 678 Td
+(1. Install Expo Go from App Store / Play Store.) Tj
+1 0 0 1 0 0 Tm
+48 664 Td
+(2. Sign in to Expo Go with the invited Expo account.) Tj
+1 0 0 1 0 0 Tm
+48 650 Td
+(3. Open Expo Go → Enter URL and paste:) Tj
+1 0 0 1 0 0 Tm
+48 636 Td
+(   exp://u.expo.dev/13d2d4f4-409c-43c7-9c90-cfb2a200b5d5?channel-name=beta) Tj
+1 0 0 1 0 0 Tm
+48 622 Td
+(4. Log in with the credentials provided by the admin.) Tj
+1 0 0 1 0 0 Tm
+48 608 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 594 Td
+(Important Notes) Tj
+1 0 0 1 0 0 Tm
+48 580 Td
+(- Updates: the same link always loads the latest beta update.) Tj
+1 0 0 1 0 0 Tm
+48 566 Td
+(- Android push notifications do NOT work in Expo Go \(Expo limitation\).) Tj
+1 0 0 1 0 0 Tm
+48 552 Td
+(- If you see a prompt asking to allow notifications, you may still accept it.) Tj
+1 0 0 1 0 0 Tm
+48 538 Td
+(- Ask AI is limited to 5 requests per day per tester \(server-side\).) Tj
+1 0 0 1 0 0 Tm
+48 524 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 510 Td
+(Test Accounts \(use provided credentials\)) Tj
+1 0 0 1 0 0 Tm
+48 496 Td
+(- PlayerOne / PlayerTwo / PlayerThree) Tj
+1 0 0 1 0 0 Tm
+48 482 Td
+(- CoachOne / CoachTwo) Tj
+1 0 0 1 0 0 Tm
+48 468 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 454 Td
+(Player Test Plan \(step-by-step\)) Tj
+1 0 0 1 0 0 Tm
+48 440 Td
+(1\) Login + Dashboard) Tj
+1 0 0 1 0 0 Tm
+48 426 Td
+(   - Sign in as Player/Parent.) Tj
+1 0 0 1 0 0 Tm
+48 412 Td
+(   - Check header, top logo placement, and layout spacing.) Tj
+1 0 0 1 0 0 Tm
+48 398 Td
+(   - Verify Quick Actions tiles show full text \(no truncation\).) Tj
+1 0 0 1 0 0 Tm
+48 384 Td
+(   - Open each Quick Action and return to dashboard.) Tj
+1 0 0 1 0 0 Tm
+48 370 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 356 Td
+(2\) Player Profile) Tj
+1 0 0 1 0 0 Tm
+48 342 Td
+(   - Update profile details: height, weight, batting hand, bowling hand, bat size/weight, pads size.) Tj
+1 0 0 1 0 0 Tm
+48 328 Td
+(   - Save and confirm changes persist after reopening.) Tj
+1 0 0 1 0 0 Tm
+48 314 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 300 Td
+(3\) Practice Videos \(Player Videos screen\)) Tj
+1 0 0 1 0 0 Tm
+48 286 Td
+(   - Tap Upload practice video.) Tj
+1 0 0 1 0 0 Tm
+48 272 Td
+(   - Pick a short video \(max ~2 mins\).) Tj
+1 0 0 1 0 0 Tm
+48 258 Td
+(   - Select a coach and accept consent.) Tj
+1 0 0 1 0 0 Tm
+48 244 Td
+(   - Confirm & Share.) Tj
+1 0 0 1 0 0 Tm
+48 230 Td
+(   - Expected: status shows Shared; coach gets a review entry.) Tj
+1 0 0 1 0 0 Tm
+48 216 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 202 Td
+(4\) Ask AI \(Player\)) Tj
+1 0 0 1 0 0 Tm
+48 188 Td
+(   - Tap Topline AI Coach.) Tj
+1 0 0 1 0 0 Tm
+48 174 Td
+(   - Ask a training question \(goal + timeframe\).) Tj
+1 0 0 1 0 0 Tm
+48 160 Td
+(   - Verify format: short answer, 3 cues, 3 drills, safety note, follow-up.) Tj
+1 0 0 1 0 0 Tm
+48 146 Td
+(   - Test daily limit \(max 5/day\).) Tj
+1 0 0 1 0 0 Tm
+48 132 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 118 Td
+(5\) Fitness \(Player Fitness screen\)) Tj
+1 0 0 1 0 0 Tm
+48 104 Td
+(   - Toggle Coach Assigned vs Self Performed.) Tj
+1 0 0 1 0 0 Tm
+48 90 Td
+(   - Log a Self Performed drill \(with reps/sets\).) Tj
+1 0 0 1 0 0 Tm
+48 76 Td
+(   - Verify history updates based on the selected toggle.) Tj
+1 0 0 1 0 0 Tm
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 2622 >>
+stream
+BT
+/F1 12 Tf
+48 720 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 706 Td
+(6\) Session Booking) Tj
+1 0 0 1 0 0 Tm
+48 692 Td
+(   - Choose coach, date, duration, time within availability.) Tj
+1 0 0 1 0 0 Tm
+48 678 Td
+(   - Submit request and verify status in Session Requests.) Tj
+1 0 0 1 0 0 Tm
+48 664 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 650 Td
+(Coach Test Plan \(step-by-step\)) Tj
+1 0 0 1 0 0 Tm
+48 636 Td
+(1\) Login + Dashboard) Tj
+1 0 0 1 0 0 Tm
+48 622 Td
+(   - Sign in as Coach.) Tj
+1 0 0 1 0 0 Tm
+48 608 Td
+(   - Verify Today’s sessions count and layout.) Tj
+1 0 0 1 0 0 Tm
+48 594 Td
+(   - Verify Booking Requests section shows newest request.) Tj
+1 0 0 1 0 0 Tm
+48 580 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 566 Td
+(2\) Booking Requests) Tj
+1 0 0 1 0 0 Tm
+48 552 Td
+(   - Accept a pending request.) Tj
+1 0 0 1 0 0 Tm
+48 538 Td
+(   - Confirm player sees status update.) Tj
+1 0 0 1 0 0 Tm
+48 524 Td
+(   - Confirm availability updates and session appears on dashboards.) Tj
+1 0 0 1 0 0 Tm
+48 510 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 496 Td
+(3\) Video Review) Tj
+1 0 0 1 0 0 Tm
+48 482 Td
+(   - Open a player-submitted video.) Tj
+1 0 0 1 0 0 Tm
+48 468 Td
+(   - Add feedback and Save.) Tj
+1 0 0 1 0 0 Tm
+48 454 Td
+(   - Use Annotate: add circle/arrow/line/text at timestamp.) Tj
+1 0 0 1 0 0 Tm
+48 440 Td
+(   - Save Markups and Send to Player.) Tj
+1 0 0 1 0 0 Tm
+48 426 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 412 Td
+(4\) Coach Upload) Tj
+1 0 0 1 0 0 Tm
+48 398 Td
+(   - Upload a coaching video to a player.) Tj
+1 0 0 1 0 0 Tm
+48 384 Td
+(   - Add notes and share.) Tj
+1 0 0 1 0 0 Tm
+48 370 Td
+(   - Verify player sees it in Coaching Videos.) Tj
+1 0 0 1 0 0 Tm
+48 356 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 342 Td
+(5\) Fitness Assign) Tj
+1 0 0 1 0 0 Tm
+48 328 Td
+(   - Assign 1–3 drills to a player.) Tj
+1 0 0 1 0 0 Tm
+48 314 Td
+(   - Verify player sees Coach Assigned list.) Tj
+1 0 0 1 0 0 Tm
+48 300 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 286 Td
+(6\) Ask AI \(Coach\)) Tj
+1 0 0 1 0 0 Tm
+48 272 Td
+(   - Ask AI about a specific player video.) Tj
+1 0 0 1 0 0 Tm
+48 258 Td
+(   - Verify output format and that it does NOT claim video analysis.) Tj
+1 0 0 1 0 0 Tm
+48 244 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 230 Td
+(What to Report \(send to admin\)) Tj
+1 0 0 1 0 0 Tm
+48 216 Td
+(- Any crashes or red errors) Tj
+1 0 0 1 0 0 Tm
+48 202 Td
+(- UI overlap/spacing issues) Tj
+1 0 0 1 0 0 Tm
+48 188 Td
+(- Incorrect status updates) Tj
+1 0 0 1 0 0 Tm
+48 174 Td
+(- Slow screens or loading loops) Tj
+1 0 0 1 0 0 Tm
+48 160 Td
+(- Unclear or confusing UX) Tj
+1 0 0 1 0 0 Tm
+48 146 Td
+(- Screenshots + steps to reproduce) Tj
+1 0 0 1 0 0 Tm
+48 132 Td
+() Tj
+1 0 0 1 0 0 Tm
+48 118 Td
+(Thanks for testing Topline Cricket!) Tj
+1 0 0 1 0 0 Tm
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000191 00000 n 
+0000003507 00000 n 
+0000003633 00000 n 
+0000006307 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+6433
+%%EOF

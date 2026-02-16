@@ -1,5 +1,7 @@
 export type Role = 'player' | 'coach' |  "parent";
 
+export type LaneType = 'short' | 'long';
+
 export type PlayerKeyStats = {
   matches: number;
   innings: number;
@@ -44,7 +46,30 @@ export type User = {
   
 };
 
-export type PlayerVideoStatus = 'draft' | 'shared';
+export type PlayerVideoStatus = 'draft' | 'sharing' | 'shared';
+
+export type VideoOverlayType = 'circle' | 'arrow' | 'line' | 'text';
+
+export type VideoOverlay = {
+  tMs: number;
+  type: VideoOverlayType;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text?: string;
+  color?: string;
+  thickness?: number;
+  draft?: boolean;
+};
+
+export type VideoOverlayDoc = {
+  videoId: string;
+  coachId: string;
+  playerId: string;
+  createdAtMs: number;
+  overlays: VideoOverlay[];
+};
 
 export type PlayerVideoItem = {
   uri: string;
@@ -94,10 +119,17 @@ export type RootStackParamList = {
   PlayerCoachingVideos: undefined;
   PlayerFitness: undefined;
   PlayerBookSessions: undefined;
+  PlayerBookLanes: undefined;
+  CoachBookLanes: undefined;
   CoachVideoReview: undefined;
   CoachFitness: undefined;
   CoachAvailability: undefined;
   CoachBookingRequests: undefined;
+  AdminAccess: undefined;
+  AdminOpeningHours: undefined;
+  AdminLanes: undefined;
+  AdminLaneAvailability: undefined;
+  AdminLaneBookings: undefined;
 };
 
 export type AppUserProfile = User & {
@@ -106,6 +138,7 @@ export type AppUserProfile = User & {
   updatedAt: string;
   coachLevel?:string;
   coachSpecialisation?:string[];
+  roleBeforeAdmin?: string;
    // ✅ add these:
   createdAtServer?: any;
   updatedAtServer?: any;

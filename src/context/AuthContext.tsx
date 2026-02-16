@@ -3,6 +3,7 @@ import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 import { auth , db} from "../firebase";
 import type { AppUserProfile, User } from "../types";
 import { getUserProfile, upsertUserProfile } from "../services/userProfile";
+import { normalizeRole } from "../utils/roles";
 import { logoutAuth } from "../services/authServices";
 import { initPushForUser } from "../utils/notifications";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -13,6 +14,9 @@ type AuthContextType = {
 
   user: AppUserProfile | null;
   setUser: (u: User | null) => Promise<void>;
+
+  isAdmin: boolean;
+  refreshAccess: () => Promise<void>;
 
   loading: boolean;
   refreshProfile: () => Promise<void>;
@@ -31,6 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<AppUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [adminClaim, setAdminClaim] = useState(false);
 
   const refreshProfile = async () => {
     if (!firebaseUser) {
@@ -75,6 +80,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const authUnsub = onAuthStateChanged(auth, (u) => {
     setFirebaseUser(u);
+    if (!u) {
+      setAdminClaim(false);
+    }
 
     // cleanup previous profile listener
     if (profileUnsub) {
@@ -87,6 +95,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
       return;
     }
+
+    // Load custom claims (non-blocking)
+    u.getIdTokenResult()
+      .then((res) => setAdminClaim(Boolean(res?.claims?.admin)))
+      .catch(() => setAdminClaim(false));
 
     // 🔥 subscribe to profile doc so it updates immediately after SignUp writes it
     const ref = doc(db, "users", u.uid);
@@ -121,9 +134,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }, [firebaseUser?.uid, profile]);
 
+  const refreshAccess = async () => {
+    try {
+      if (!auth.currentUser) return;
+      const res = await auth.currentUser.getIdTokenResult(true);
+      setAdminClaim(Boolean(res?.claims?.admin));
+    } catch (e) {
+      console.log("refreshAccess failed:", e);
+    }
+  };
+
   const logout = async () => {
     await logoutAuth();
   };
+
+  const profileRole = normalizeRole(profile?.role);
+  const isAdmin = Boolean(adminClaim || profileRole === "admin");
 
   const value = useMemo<AuthContextType>(
     () => ({
@@ -131,11 +157,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       profile,
       user: profile,
       setUser,
+      isAdmin,
+      refreshAccess,
       loading,
       refreshProfile,
       logout,
     }),
-    [firebaseUser, profile, loading]
+    [firebaseUser, profile, loading, isAdmin]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

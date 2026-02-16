@@ -1,0 +1,306 @@
+rules_version = "2";
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(uid())).data.role;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function isCoach() {
+      return signedIn() && (myRole() == "coach" || isAdmin());
+    }
+
+    function isPlayerOrParent() {
+      return signedIn() && (myRole() in ["player", "parent"]);
+    }
+
+    function isSelf(userId) {
+      return signedIn() && uid() == userId;
+    }
+
+    function cannotChangeKeys(lockedKeys) {
+      return lockedKeys.size() == 0
+        || (
+          (lockedKeys.size() < 1 || request.resource.data[lockedKeys[0]] == resource.data[lockedKeys[0]]) &&
+          (lockedKeys.size() < 2 || request.resource.data[lockedKeys[1]] == resource.data[lockedKeys[1]]) &&
+          (lockedKeys.size() < 3 || request.resource.data[lockedKeys[2]] == resource.data[lockedKeys[2]]) &&
+          (lockedKeys.size() < 4 || request.resource.data[lockedKeys[3]] == resource.data[lockedKeys[3]]) &&
+          (lockedKeys.size() < 5 || request.resource.data[lockedKeys[4]] == resource.data[lockedKeys[4]])
+        );
+    }
+
+    // Helper: changed keys on update only
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).changedKeys();
+    }
+
+    // ---------- PRIVATE USERS (tokens, prefs, etc.) ----------
+    match /users/{userId} {
+      allow read, create, update: if isSelf(userId);
+      allow delete: if false;
+    }
+
+    // ---------- PUBLIC USERS (for pickers) ----------
+    // IMPORTANT:
+    // Firestore rules cannot enforce "query must have where role == coach".
+    // So: allow list for signed-in users, but only store SAFE fields in this collection.
+    match /publicUsers/{userId} {
+      allow get, list: if signedIn() && request.query.limit <= 200;
+
+      // self can create/update own public profile, but cannot change role
+      allow create, update: if isSelf(userId) && cannotChangeKeys(["role"]);
+
+      allow delete: if false;
+    }
+
+    // ---------- ACADEMY SETTINGS ----------
+    match /academySettings/{docId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ---------- OPENING HOURS ----------
+    match /openingHours/{docId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /openingHoursPeriods/{docId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /openingHoursOverrides/{docId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ---------- LANES ----------
+    match /lanes/{laneId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ---------- LANE AVAILABILITY ----------
+    match /laneAvailability/{docId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ---------- LANE BOOKINGS ----------
+    match /laneBookings/{bookingId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (
+        isAdmin()
+        || request.resource.data.playerId == uid()
+        || request.resource.data.coachId == uid()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- FITNESS ENTRIES ----------
+    function linkedPlayerId() {
+      return get(/databases/$(database)/documents/users/$(uid())).data.linkedPlayerId;
+    }
+
+    function isParentOfPlayer(playerId) {
+      return signedIn()
+        && myRole() == "parent"
+        && linkedPlayerId() == playerId;
+    }
+
+    match /fitnessEntries/{entryId} {
+      allow read: if signedIn() && (
+        resource.data.playerId == uid() ||
+        resource.data.coachId == uid() ||
+        isParentOfPlayer(resource.data.playerId)
+      );
+
+      allow create: if signedIn() && (
+        (request.resource.data.coachId == uid() && request.resource.data.source == "coach") ||
+        (request.resource.data.playerId == uid() && request.resource.data.source in ["self", "player"])
+      );
+
+      allow update: if signedIn() && (
+        resource.data.playerId == uid() ||
+        resource.data.coachId == uid() ||
+        isParentOfPlayer(resource.data.playerId)
+      )
+      && cannotChangeKeys(["playerId", "coachId", "source"]);
+
+      allow delete: if false;
+    }
+
+    // ---------- SESSIONS ----------
+    match /sessions/{sessionId} {
+
+      // both parties can read
+      allow read: if signedIn() && (
+        resource.data.playerId == uid() ||
+        resource.data.coachId == uid()
+      );
+
+      // ONLY coach creates the actual session record
+      allow create: if signedIn()
+        && request.resource.data.coachId == uid()
+        && request.resource.data.playerId is string;
+
+      // updates: coach only
+      allow update: if signedIn()
+        && resource.data.coachId == uid()
+        && cannotChangeKeys(["playerId", "coachId"]);
+
+      allow delete: if false;
+    }
+
+    // ---------- SESSION REQUESTS ----------
+    match /sessionRequests/{reqId} {
+
+      // both can read their own requests
+      allow read: if signedIn() && (
+        resource.data.playerId == uid() ||
+        resource.data.coachId == uid()
+      );
+
+      // Player creates a request
+      allow create: if signedIn()
+        && request.resource.data.playerId == uid()
+        && request.resource.data.status == "requested"
+        && request.resource.data.coachId is string;
+
+      // Updates:
+      // - Coach can move requested -> confirmed/declined/countered (and set scheduling fields)
+      // - Player can ONLY cancel when still requested
+      allow update: if signedIn()
+        && cannotChangeKeys(["playerId", "coachId"])
+        && (
+          // ---- Coach action ----
+          (resource.data.coachId == uid() && changedKeys().hasOnly([
+            "status",
+            "coachMessage",
+            "coachNote",
+            "scheduledAt",
+            "scheduledAtMs",
+            "proposedAt",
+            "proposedAtMs",
+            "updatedAt",
+            "updatedAtMs"
+          ]))
+          ||
+          // ---- Player cancel only ----
+          (resource.data.playerId == uid()
+            && resource.data.status == "requested"
+            && request.resource.data.status == "cancelled"
+            && changedKeys().hasOnly(["status", "updatedAt", "updatedAtMs"])
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    // ---------- COACH AVAILABILITY ----------
+    match /coachAvailability/{docId} {
+      allow read: if signedIn();
+
+      // ✅ CREATE: no cannotChangeKeys here because resource doesn't exist yet
+      allow create: if signedIn()
+        && request.resource.data.coachId == uid();
+
+      // ✅ UPDATE: must already belong to this coach, and coachId cannot change
+      allow update: if signedIn()
+        && resource.data.coachId == uid()
+        && request.resource.data.coachId == uid()
+        && cannotChangeKeys(["coachId"]);
+
+      allow delete: if false;
+    }
+
+    // ---------- Overlays ----------
+    match /videoOverlays/{videoId} {
+      allow read: if signedIn() && (
+        get(/databases/$(database)/documents/videos/$(videoId)).data.playerId == uid() ||
+        get(/databases/$(database)/documents/videos/$(videoId)).data.coachId == uid()
+      );
+
+      allow create, update: if signedIn()
+        && get(/databases/$(database)/documents/videos/$(videoId)).data.coachId == uid()
+        && request.resource.data.videoId == videoId
+        && request.resource.data.coachId == uid()
+        && request.resource.data.playerId ==
+            get(/databases/$(database)/documents/videos/$(videoId)).data.playerId;
+
+      allow delete: if false;
+    }
+
+    // ---------- VIDEOS ----------
+    match /videos/{videoId} {
+
+      allow read: if signedIn() && (
+        resource.data.playerId == uid() ||
+        resource.data.coachId == uid()
+      );
+
+      allow create: if signedIn() && (
+        (request.resource.data.uploadedBy == "player" &&
+         request.resource.data.playerId == uid())
+        ||
+        (request.resource.data.uploadedBy == "coach" &&
+         request.resource.data.coachId == uid())
+      );
+
+      allow update: if signedIn() && (
+        // Coach reviewing player video: only feedback/review fields
+        (resource.data.uploadedBy == "player" &&
+         resource.data.coachId == uid() &&
+         cannotChangeKeys(["uploadedBy", "playerId", "coachId", "videoUrl", "storagePath"]) &&
+         changedKeys().hasOnly([
+           "feedback",
+           "reviewed",
+           "status",
+           "reviewedAt",
+           "markupsShared",
+           "markupsSharedAtMs"
+         ])
+        )
+        ||
+        // Coach-uploaded video: coach can edit notes only
+        (resource.data.uploadedBy == "coach" &&
+         resource.data.coachId == uid() &&
+         cannotChangeKeys(["uploadedBy", "playerId", "coachId", "videoUrl", "storagePath"]) &&
+         changedKeys().hasOnly(["notes", "status"])
+        )
+      );
+
+      allow delete: if false;
+    }
+
+    // ---------- NOTIFICATIONS ----------
+    match /notifications/{notifId} {
+      allow read: if signedIn() && resource.data.userId == uid();
+
+      allow update: if signedIn()
+        && resource.data.userId == uid()
+        && changedKeys().hasOnly(["read", "readAtMs"]);
+
+      allow create, delete: if false;
+    }
+
+    // ---------- FALLBACK ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

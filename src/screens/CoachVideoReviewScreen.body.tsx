@@ -3,7 +3,7 @@
 // 1) Add coach consent checkbox for coach uploads (same pattern as player)
 // 2) Block upload until consent accepted
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -14,11 +14,12 @@ import {
   TextInput,
   Alert,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
+import { Video, ResizeMode, AVPlaybackStatus, VideoReadyForDisplayEvent } from 'expo-av';
 
 import { useAuth } from '../context/AuthContext';
 import { db, storage, serverTimestamp } from '../firebase';
@@ -26,6 +27,9 @@ import { styles } from '../styles/styles';
 import { formatDayDate } from '../utils/dateFormatter';
 import { fetchPlayersAndParents } from "../utils/publicUsers";
 import { askAI } from '../services/askAI';
+import VideoOverlayLayer from '../components/VideoOverlayLayer';
+import { listenVideoOverlays, saveVideoOverlays } from '../services/videoOverlays';
+import type { VideoOverlay, VideoOverlayType } from '../types';
 
 import {
   collection,
@@ -122,8 +126,57 @@ const CoachVideoReviewScreenBody: React.FC<any> = ({ navigation }: any) => {
   const [askLoading, setAskLoading] = useState(false);
   const [askVideoId, setAskVideoId] = useState('');
 
+  // Markups (coach)
+  const reviewVideoRef = useRef<Video>(null);
+  const [annotateOn, setAnnotateOn] = useState(false);
+  const [overlayType, setOverlayType] = useState<VideoOverlayType>('circle');
+  const [overlayText, setOverlayText] = useState('Note');
+  const [overlayColor, setOverlayColor] = useState('#bb2b2b');
+  const [overlayThickness, setOverlayThickness] = useState(3);
+  const [overlayItems, setOverlayItems] = useState<VideoOverlay[]>([]);
+  const [overlayRedo, setOverlayRedo] = useState<VideoOverlay[]>([]);
+  const [overlaySize, setOverlaySize] = useState({ w: 0, h: 0 });
+  const [overlayMs, setOverlayMs] = useState(0);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragCurrent, setDragCurrent] = useState<{ x: number; y: number } | null>(null);
+  const [autoSave, setAutoSave] = useState(false);
+  const [savingOverlays, setSavingOverlays] = useState(false);
+  const savingOverlaysRef = useRef(false);
+  const [reviewVideoSize, setReviewVideoSize] = useState<{
+    width: number;
+    height: number;
+    orientation: 'portrait' | 'landscape';
+  } | null>(null);
+
+  const { width: windowWidth } = useWindowDimensions();
+
+  const reviewStageWidth = useMemo(() => Math.max(0, windowWidth - 36), [windowWidth]);
+  const reviewStageHeight = useMemo(() => {
+    const aspect =
+      reviewVideoSize && reviewVideoSize.width && reviewVideoSize.height
+        ? reviewVideoSize.width / reviewVideoSize.height
+        : 16 / 9;
+    return Math.round(reviewStageWidth / aspect);
+  }, [reviewStageWidth, reviewVideoSize]);
+  const reviewStageStyle = useMemo(
+    () => [
+      styles.videoStage,
+      {
+        width: reviewStageWidth,
+        height: reviewStageHeight,
+        alignSelf: 'center',
+      },
+    ],
+    [reviewStageWidth, reviewStageHeight]
+  );
+  const isDrawing = annotateOn && !!dragStart;
+
   const playerNameById = (playerId: string) =>
     players.find((p) => p.id === playerId)?.name ?? '';
+
+  const textPresets = ['Footwork', 'Head still', 'Elbow high', 'Front shoulder', 'Follow through', 'Tempo'];
+  const colorPresets = ['#bb2b2b', '#0f766e', '#1d4ed8', '#f59e0b', '#111827'];
+  const thicknessPresets = [2, 3, 4, 5];
 
   const reviewOptions = useMemo(
     () => forReview.map((v) => ({ id: v.id, label: v.playerName || 'Player' })),
@@ -195,11 +248,267 @@ const CoachVideoReviewScreenBody: React.FC<any> = ({ navigation }: any) => {
   const openReview = (v: VideoDoc) => {
     setSelected(v);
     setDraftFeedback(v.feedback || '');
+    setAnnotateOn(false);
+    setOverlayType('circle');
+    setDragStart(null);
+    setDragCurrent(null);
+    setOverlayRedo([]);
+    setOverlayMs(0);
+    setReviewVideoSize(null);
   };
 
   const closeReview = () => {
     setSelected(null);
     setDraftFeedback('');
+    setAnnotateOn(false);
+    setDragStart(null);
+    setDragCurrent(null);
+    setReviewVideoSize(null);
+  };
+
+  useEffect(() => {
+    if (!selected?.id) {
+      setOverlayItems([]);
+      return;
+    }
+    const unsub = listenVideoOverlays(selected.id, (doc) => {
+      setOverlayItems(doc?.overlays || []);
+      setOverlayRedo([]);
+    });
+    return () => unsub();
+  }, [selected?.id]);
+
+  const onReviewStatus = (status: AVPlaybackStatus) => {
+    if (!status.isLoaded) return;
+    setOverlayMs(status.positionMillis || 0);
+  };
+
+  const onReviewReadyForDisplay = (event: VideoReadyForDisplayEvent) => {
+    const { width, height, orientation } = event.naturalSize || {};
+    if (!width || !height) return;
+    setReviewVideoSize((prev) => {
+      if (prev && prev.width === width && prev.height === height) return prev;
+      return { width, height, orientation };
+    });
+  };
+
+  const pauseReviewVideo = () => {
+    try {
+      reviewVideoRef.current?.pauseAsync?.();
+    } catch {}
+  };
+
+  const formatMs = (ms: number) => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${String(r).padStart(2, '0')}`;
+  };
+
+  const jumpTo = async (ms: number) => {
+    const next = Math.max(0, Math.round(ms));
+    setOverlayMs(next);
+    pauseReviewVideo();
+    try {
+      await reviewVideoRef.current?.setPositionAsync?.(next);
+    } catch {}
+  };
+
+  const addOverlay = (ov: VideoOverlay) => {
+    setOverlayItems((prev) => {
+      const next = [...prev, ov];
+      if (autoSave && !savingOverlaysRef.current) {
+        persistOverlays(false, next);
+      }
+      return next;
+    });
+    setOverlayRedo([]);
+    pauseReviewVideo();
+  };
+
+  const buildOverlayFromPoints = (
+    start: { x: number; y: number },
+    end: { x: number; y: number }
+  ): VideoOverlay | null => {
+    if (!overlaySize.w || !overlaySize.h) return null;
+    const tMs = Math.round(overlayMs || 0);
+    const color = overlayColor;
+    const thickness = overlayThickness;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const distPx = Math.sqrt(
+      Math.pow(dx * overlaySize.w, 2) + Math.pow(dy * overlaySize.h, 2)
+    );
+    const isTap = distPx < 6;
+
+    if (overlayType === 'text') {
+      return {
+        tMs,
+        type: 'text',
+        x: start.x,
+        y: start.y,
+        w: 0,
+        h: 0,
+        text: overlayText.trim() || 'Note',
+        color,
+        thickness: Math.max(2, thickness),
+      };
+    }
+
+    if (overlayType === 'line' || overlayType === 'arrow') {
+      if (isTap) return null;
+      return {
+        tMs,
+        type: overlayType,
+        x: start.x,
+        y: start.y,
+        w: dx,
+        h: dy,
+        color,
+        thickness,
+      };
+    }
+
+    const minDim = Math.min(overlaySize.w, overlaySize.h);
+    const radius = isTap ? 0.07 : Math.min(0.3, (distPx / minDim));
+    const diameter = radius * 2;
+
+    return {
+      tMs,
+      type: 'circle',
+      x: start.x,
+      y: start.y,
+      w: diameter,
+      h: diameter,
+      color,
+      thickness,
+    };
+  };
+
+  const handleAnnotateStart = (e: any) => {
+    if (!annotateOn || !overlaySize.w || !overlaySize.h) return;
+    const { locationX, locationY } = e.nativeEvent;
+    const x = locationX / overlaySize.w;
+    const y = locationY / overlaySize.h;
+    setDragStart({ x, y });
+    setDragCurrent({ x, y });
+    pauseReviewVideo();
+  };
+
+  const handleAnnotateMove = (e: any) => {
+    if (!annotateOn || !dragStart || !overlaySize.w || !overlaySize.h) return;
+    const { locationX, locationY } = e.nativeEvent;
+    setDragCurrent({
+      x: locationX / overlaySize.w,
+      y: locationY / overlaySize.h,
+    });
+  };
+
+  const handleAnnotateEnd = () => {
+    if (!annotateOn || !dragStart) return;
+    const end = dragCurrent || dragStart;
+    const ov = buildOverlayFromPoints(dragStart, end);
+    if (ov) {
+      addOverlay(ov);
+    }
+    setDragStart(null);
+    setDragCurrent(null);
+  };
+
+  const draftOverlay = useMemo(() => {
+    if (!annotateOn || !dragStart) return null;
+    const end = dragCurrent || dragStart;
+    const ov = buildOverlayFromPoints(dragStart, end);
+    return ov ? { ...ov, draft: true } : null;
+  }, [
+    annotateOn,
+    dragStart,
+    dragCurrent,
+    overlayType,
+    overlayText,
+    overlayColor,
+    overlayThickness,
+    overlayMs,
+    overlaySize.w,
+    overlaySize.h,
+  ]);
+
+  const nudgeTime = (deltaMs: number) => {
+    jumpTo((overlayMs || 0) + deltaMs);
+  };
+
+  const undoOverlay = () => {
+    setOverlayItems((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      setOverlayRedo((redo) => [...redo, last]);
+      return prev.slice(0, -1);
+    });
+  };
+
+  const redoOverlay = () => {
+    setOverlayRedo((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      setOverlayItems((items) => [...items, last]);
+      return prev.slice(0, -1);
+    });
+  };
+
+  const deleteLastOverlay = () => {
+    setOverlayItems((prev) => prev.slice(0, -1));
+    setOverlayRedo([]);
+  };
+
+  const centerLastOverlay = () => {
+    setOverlayItems((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      return [
+        ...prev.slice(0, -1),
+        { ...last, x: 0.5, y: 0.5 },
+      ];
+    });
+  };
+
+  const persistOverlays = async (notify: boolean, list?: VideoOverlay[]) => {
+    if (!selected?.id || !coachUid || !selected.playerId) return;
+    try {
+      if (savingOverlaysRef.current) return;
+      savingOverlaysRef.current = true;
+      setSavingOverlays(true);
+      await saveVideoOverlays({
+        videoId: selected.id,
+        coachId: coachUid,
+        playerId: selected.playerId,
+        createdAtMs: Date.now(),
+        overlays: list ?? overlayItems,
+      });
+      if (notify) {
+        Alert.alert('Saved', 'Markups saved.');
+      }
+    } catch (e: any) {
+      console.log('Save overlays failed:', e);
+      Alert.alert('Error', e?.message || 'Failed to save markups');
+    } finally {
+      savingOverlaysRef.current = false;
+      setSavingOverlays(false);
+    }
+  };
+
+  const sendMarkupsToPlayer = async () => {
+    if (!selected?.id) return;
+    await persistOverlays(false);
+    try {
+      await updateDoc(doc(db, 'videos', selected.id), {
+        markupsShared: true,
+        markupsSharedAtMs: Date.now(),
+      });
+      Alert.alert('Sent', 'Markups shared with the player.');
+    } catch (e: any) {
+      console.log('Send markups failed:', e);
+      Alert.alert('Error', e?.message || 'Failed to send markups');
+    }
   };
 
   const openAskAI = () => {
@@ -710,7 +1019,7 @@ useEffect(() => {
         {/* Review Modal */}
         <Modal visible={!!selected} animationType="slide" onRequestClose={closeReview}>
           <SafeAreaView style={styles.screenContainer}>
-            <ScrollView contentContainerStyle={styles.formScroll}>
+            <ScrollView contentContainerStyle={styles.formScroll} scrollEnabled={!isDrawing}>
               <View style={styles.coachReviewHeaderRow}>
                 <Text style={styles.coachSectionTitle}>Review</Text>
 
@@ -731,13 +1040,270 @@ useEffect(() => {
                       {selected.reviewed || selected.status === 'reviewed' ? 'Reviewed' : 'Pending'}
                     </Text>
 
-                    <View style={{ marginTop: 12 }}>
+                    <View
+                      style={reviewStageStyle}
+                      onLayout={(e) =>
+                        setOverlaySize({
+                          w: e.nativeEvent.layout.width,
+                          h: e.nativeEvent.layout.height,
+                        })
+                      }
+                    >
                       <Video
+                        ref={reviewVideoRef}
                         source={{ uri: selected.videoUrl || '' }}
-                        style={styles.videoPlayer}
+                        style={styles.videoStageVideo}
                         useNativeControls
                         resizeMode={ResizeMode.CONTAIN}
+                        onPlaybackStatusUpdate={onReviewStatus}
+                        onReadyForDisplay={onReviewReadyForDisplay}
+                        progressUpdateIntervalMillis={250}
                       />
+                      <VideoOverlayLayer
+                        overlays={overlayItems}
+                        currentTimeMs={overlayMs}
+                        width={overlaySize.w}
+                        height={overlaySize.h}
+                        draftOverlay={draftOverlay}
+                      />
+                      {annotateOn ? (
+                        <View
+                          style={styles.videoStageTouch}
+                          onStartShouldSetResponder={() => true}
+                          onMoveShouldSetResponder={() => true}
+                          onStartShouldSetResponderCapture={() => true}
+                          onMoveShouldSetResponderCapture={() => true}
+                          onResponderTerminationRequest={() => false}
+                          onResponderTerminate={handleAnnotateEnd}
+                          onResponderGrant={handleAnnotateStart}
+                          onResponderMove={handleAnnotateMove}
+                          onResponderRelease={handleAnnotateEnd}
+                        />
+                      ) : null}
+                    </View>
+
+                    <View style={{ marginTop: 6 }}>
+                      <TouchableOpacity
+                        style={[styles.secondaryButton, { paddingVertical: 8 }]}
+                        onPress={() =>
+                          setAnnotateOn((v) => {
+                            const next = !v;
+                            if (next) {
+                              pauseReviewVideo();
+                            } else {
+                              setDragStart(null);
+                              setDragCurrent(null);
+                            }
+                            return next;
+                          })
+                        }
+                      >
+                        <Text style={styles.secondaryButtonText}>
+                          {annotateOn ? '✓ Annotate On' : 'Annotate'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {annotateOn ? (
+                        <>
+                          <View style={styles.overlayToolRow}>
+                            {(['circle', 'arrow', 'line', 'text'] as VideoOverlayType[]).map((t) => (
+                              <TouchableOpacity
+                                key={t}
+                                style={[
+                                  styles.overlayToolPill,
+                                  overlayType === t ? styles.overlayToolPillActive : null,
+                                ]}
+                                onPress={() => {
+                                  setOverlayType(t);
+                                  setDragStart(null);
+                                  setDragCurrent(null);
+                                }}
+                              >
+                                <Text
+                                  style={[
+                                    styles.overlayToolText,
+                                    overlayType === t ? styles.overlayToolTextActive : null,
+                                  ]}
+                                >
+                                  {t}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+
+                          <View style={styles.overlaySwatchRow}>
+                            {colorPresets.map((c) => (
+                              <TouchableOpacity
+                                key={c}
+                                onPress={() => setOverlayColor(c)}
+                                style={[
+                                  styles.overlaySwatch,
+                                  { backgroundColor: c },
+                                  overlayColor === c ? styles.overlaySwatchActive : null,
+                                ]}
+                              />
+                            ))}
+                            <View style={styles.overlaySwatchDivider} />
+                            {thicknessPresets.map((t) => (
+                              <TouchableOpacity
+                                key={t}
+                                onPress={() => setOverlayThickness(t)}
+                                style={[
+                                  styles.overlayThicknessPill,
+                                  overlayThickness === t ? styles.overlayThicknessPillActive : null,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.overlayThicknessText,
+                                    overlayThickness === t ? styles.overlayThicknessTextActive : null,
+                                  ]}
+                                >
+                                  {t}px
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+
+                          {overlayType === 'text' ? (
+                            <>
+                              <TextInput
+                                style={[styles.statsInput, { height: 44, marginTop: 8 }]}
+                                placeholder="Label text"
+                                value={overlayText}
+                                onChangeText={setOverlayText}
+                              />
+                              <View style={styles.overlayChipRow}>
+                                {textPresets.map((p) => (
+                                  <TouchableOpacity
+                                    key={p}
+                                    onPress={() => {
+                                      setOverlayType('text');
+                                      setOverlayText(p);
+                                    }}
+                                    style={[
+                                      styles.overlayChip,
+                                      overlayText === p ? styles.overlayChipActive : null,
+                                    ]}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.overlayChipText,
+                                        overlayText === p ? styles.overlayChipTextActive : null,
+                                      ]}
+                                    >
+                                      {p}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </>
+                          ) : null}
+
+                          <View style={styles.overlayActionRow}>
+                            <TouchableOpacity style={styles.overlayActionPill} onPress={undoOverlay}>
+                              <Text style={styles.overlayActionText}>Undo</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.overlayActionPill} onPress={redoOverlay}>
+                              <Text style={styles.overlayActionText}>Redo</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.overlayActionPill} onPress={deleteLastOverlay}>
+                              <Text style={styles.overlayActionText}>Delete last</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.overlayActionPill} onPress={centerLastOverlay}>
+                              <Text style={styles.overlayActionText}>Center last</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.overlayActionPill,
+                                autoSave ? styles.overlayActionPillActive : null,
+                              ]}
+                              onPress={() => setAutoSave((v) => !v)}
+                            >
+                              <Text
+                                style={[
+                                  styles.overlayActionText,
+                                  autoSave ? styles.overlayActionTextActive : null,
+                                ]}
+                              >
+                                Auto-save {autoSave ? 'On' : 'Off'}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          <View style={styles.overlayTimeRow}>
+                            <Text style={styles.overlayTimeText}>
+                              Time {formatMs(overlayMs)}
+                            </Text>
+                            <View style={styles.overlayTimeBtns}>
+                              <TouchableOpacity
+                                style={styles.overlayTimeBtn}
+                                onPress={() => nudgeTime(-100)}
+                              >
+                                <Text style={styles.overlayTimeBtnText}>-0.1s</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.overlayTimeBtn}
+                                onPress={() => nudgeTime(100)}
+                              >
+                                <Text style={styles.overlayTimeBtnText}>+0.1s</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+
+                          <Text style={styles.overlayHintText}>
+                            Tap to place a marker. Drag to size circles or draw lines/arrows.
+                          </Text>
+
+                          {overlayItems.length > 0 ? (
+                            <View style={styles.overlayList}>
+                              {overlayItems
+                                .slice()
+                                .sort((a, b) => a.tMs - b.tMs)
+                                .slice(-8)
+                                .map((o, idx) => (
+                                  <TouchableOpacity
+                                    key={`${o.tMs}_${idx}`}
+                                    style={styles.overlayListItem}
+                                    onPress={() => jumpTo(o.tMs)}
+                                  >
+                                    <Text style={styles.overlayListTime}>{formatMs(o.tMs)}</Text>
+                                    <Text style={styles.overlayListType}>{o.type}</Text>
+                                    {o.text ? (
+                                      <Text style={styles.overlayListNote} numberOfLines={1}>
+                                        {o.text}
+                                      </Text>
+                                    ) : null}
+                                  </TouchableOpacity>
+                                ))}
+                              {overlayItems.length > 8 ? (
+                                <Text style={styles.overlayListMore}>
+                                  +{overlayItems.length - 8} more
+                                </Text>
+                              ) : null}
+                            </View>
+                          ) : null}
+                        </>
+                      ) : null}
+
+                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                        <TouchableOpacity
+                          style={[styles.primaryButton, { flex: 1, paddingVertical: 10 }]}
+                          onPress={() => persistOverlays(true)}
+                          disabled={savingOverlays}
+                        >
+                          <Text style={styles.primaryButtonText}>
+                            {savingOverlays ? 'Saving…' : 'Save Markups'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.confirmButton, { flex: 1, paddingVertical: 10 }]}
+                          onPress={sendMarkupsToPlayer}
+                          disabled={savingOverlays}
+                        >
+                          <Text style={styles.confirmButtonText}>Send to Player</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
 

@@ -4,15 +4,10 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, serverTimestamp } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
+import Constants from 'expo-constants';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyA2zextrJ42baggK36f-PkCGtaFfdwrFK8",
-  authDomain: "topline-cricket.firebaseapp.com",
-  projectId: "topline-cricket",
-  storageBucket: "topline-cricket.firebasestorage.app",
-  messagingSenderId: "1059546000366",
-  appId: "1:1059546000366:web:cecab29fe1e72bbce07cff"
-};
+const extra = (Constants.expoConfig?.extra ?? (Constants as any).manifest?.extra ?? {}) as any;
+const firebaseConfig = extra.firebase ?? {};
 
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);

@@ -6,16 +6,24 @@ import { Platform } from "react-native";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
+const isExpoGo =
+  Constants.appOwnership === "expo" || Constants.executionEnvironment === "storeClient";
+const isExpoGoAndroid = isExpoGo && Platform.OS === "android";
+
 // ✅ Foreground behavior (new Expo types need banner/list fields too)
-Notifications.setNotificationHandler({
-  handleNotification: async (): Promise<Notifications.NotificationBehavior> => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async (): Promise<Notifications.NotificationBehavior> => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+} catch (e) {
+  console.log("Notification handler skipped:", e);
+}
 
 export type PushPrefs = {
   videos?: boolean;
@@ -25,6 +33,10 @@ export type PushPrefs = {
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   try {
+    if (isExpoGoAndroid) {
+      console.log("Expo Go Android doesn't support remote push notifications. Use a dev build.");
+      return null;
+    }
     if (!Device.isDevice) {
       console.log("Push notifications require a physical device.");
       return null;

@@ -8,18 +8,26 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore';
 
 import type { RootStackParamList } from '../types';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { styles } from '../styles/styles';
+import TimePickerModal from '../components/TimePickerModal';
 import { formatDayDate } from '../utils/dateFormatter';
 import { toplineLogo } from '../constants/assets';
+import {
+  DEFAULT_WEEK,
+  OpeningOverride,
+  OpeningPeriod,
+  WeekHours,
+  getDayHoursForDate,
+} from '../utils/openingHours';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CoachAvailability'>;
 
@@ -28,16 +36,17 @@ type Slot = { start: string; end: string; isBooked: boolean };
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const toHHMM = (mins: number) => `${pad2(Math.floor(mins / 60))}:${pad2(mins % 60)}`;
 
-function isWeekend(d: Date) {
-  const day = d.getDay(); // 0=Sun ... 6=Sat
-  return day === 0 || day === 6;
-}
+const toMinutes = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return -1;
+  return h * 60 + m;
+};
 
-function buildStartTimes(d: Date, stepMins = 30) {
-  const start = 9 * 60;
-  const end = isWeekend(d) ? 13 * 60 : 18 * 60; // last end boundary
+function buildStartTimes(openM: number, closeM: number, durationMins: number, stepMins = 30) {
   const starts: string[] = [];
-  for (let t = start; t <= end - stepMins; t += stepMins) {
+  const latestStart = closeM - durationMins;
+  if (latestStart < openM) return starts;
+  for (let t = openM; t <= latestStart; t += stepMins) {
     starts.push(toHHMM(t));
   }
   return starts;
@@ -49,13 +58,10 @@ function addMinutes(hhmm: string, minsToAdd: number) {
   return toHHMM(total);
 }
 
-function withinRange(date: Date, startHHMM: string, durationMins: number) {
-  const start = 9 * 60;
-  const end = isWeekend(date) ? 13 * 60 : 18 * 60;
-  const [h, m] = startHHMM.split(':').map(x => parseInt(x, 10));
-  const st = h * 60 + m;
+function withinRange(openM: number, closeM: number, startHHMM: string, durationMins: number) {
+  const st = toMinutes(startHHMM);
   const en = st + durationMins;
-  return st >= start && en <= end;
+  return st >= openM && en <= closeM;
 }
 
 function overlaps(a: Slot, b: Slot) {
@@ -82,11 +88,35 @@ export default function CoachAvailabilityScreenBody({ navigation }: Props) {
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
 
   const [slots, setSlots] = useState<Slot[]>([]);
+  const [defaultWeek, setDefaultWeek] = useState<WeekHours>(DEFAULT_WEEK);
+  const [periods, setPeriods] = useState<OpeningPeriod[]>([]);
+  const [override, setOverride] = useState<OpeningOverride | null>(null);
 
   // Picker state
-  const startTimes = useMemo(() => buildStartTimes(date, 30), [date]);
-  const [selectedStart, setSelectedStart] = useState<string>('09:00');
   const [duration, setDuration] = useState<number>(60); // mins
+  const [timePicker, setTimePicker] = useState<{ visible: boolean; value: Date }>({
+    visible: false,
+    value: new Date(),
+  });
+
+  const dayHours = getDayHoursForDate({
+    date,
+    dateKey,
+    defaultWeek,
+    periods,
+    override,
+  });
+  const openM = toMinutes(dayHours.open);
+  const closeM = toMinutes(dayHours.close);
+  const allowedCloseM = closeM >= 0 ? closeM - 60 : -1;
+  const isClosed = !!dayHours.isClosed;
+
+  const startTimes = useMemo(() => {
+    if (isClosed || openM < 0 || allowedCloseM < 0) return [];
+    return buildStartTimes(openM, allowedCloseM, duration, 30);
+  }, [openM, allowedCloseM, duration, isClosed]);
+
+  const [selectedStart, setSelectedStart] = useState<string>(dayHours.open || '06:00');
 
   // ✅ local YYYY-MM-DD
   const dateKey = useMemo(() => {
@@ -122,14 +152,145 @@ export default function CoachAvailabilityScreenBody({ navigation }: Props) {
     return () => unsub();
   }, [coachId, docId]);
 
+  // Load opening hours (default week)
+  useEffect(() => {
+    const ref = doc(db, 'openingHours', 'defaultWeek');
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const data: any = snap.exists() ? snap.data() : null;
+        const next = (data?.week || DEFAULT_WEEK) as WeekHours;
+        setDefaultWeek({ ...DEFAULT_WEEK, ...next });
+      },
+      () => setDefaultWeek(DEFAULT_WEEK)
+    );
+    return () => unsub();
+  }, []);
+
+  // Load seasonal periods
+  useEffect(() => {
+    const q = query(collection(db, 'openingHoursPeriods'), orderBy('startDate', 'desc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as OpeningPeriod[];
+        setPeriods(rows);
+      },
+      () => setPeriods([])
+    );
+    return () => unsub();
+  }, []);
+
+  // Load override for selected date
+  useEffect(() => {
+    const ref = doc(db, 'openingHoursOverrides', dateKey);
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const data: any = snap.exists() ? snap.data() : null;
+        setOverride(data ? ({ id: snap.id, ...(data as any) } as OpeningOverride) : null);
+      },
+      () => setOverride(null)
+    );
+    return () => unsub();
+  }, [dateKey]);
+
   // reset selected start if date changes
   useEffect(() => {
-    setSelectedStart(startTimes[0] || '09:00');
+    setSelectedStart(startTimes[0] || dayHours.open || '06:00');
   }, [startTimes]);
 
+  const roundToStep = (d: Date, step = 30) => {
+    const mins = d.getMinutes();
+    const snapped = Math.round(mins / step) * step;
+    const next = new Date(d);
+    next.setMinutes(snapped);
+    next.setSeconds(0);
+    next.setMilliseconds(0);
+    return next;
+  };
+
+  const findNearestOption = (target: string, options: string[]) => {
+    if (!options.length) return '';
+    const t = toMinutes(target);
+    let best = options[0];
+    let bestDiff = Number.POSITIVE_INFINITY;
+    options.forEach((opt) => {
+      const diff = Math.abs(toMinutes(opt) - t);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = opt;
+      }
+    });
+    return best;
+  };
+
+  const openTimePicker = () => {
+    if (startTimes.length === 0) {
+      Alert.alert('No availability', 'No start times available for this duration.');
+      return;
+    }
+    const base = selectedStart || startTimes[0];
+    const [h, m] = base.split(':').map(Number);
+    const d = new Date(date);
+    d.setHours(h, m, 0, 0);
+    setTimePicker({ visible: true, value: d });
+  };
+
+  const closeTimePicker = () => {
+    setTimePicker((prev) => ({ ...prev, visible: false }));
+  };
+
+  const applyPickedTime = (picked: Date) => {
+    if (startTimes.length === 0) {
+      return;
+    }
+    const snapped = roundToStep(picked, 30);
+    const hhmm = toHHMM(snapped.getHours() * 60 + snapped.getMinutes());
+    if (startTimes.includes(hhmm)) {
+      setSelectedStart(hhmm);
+      return;
+    }
+    const nearest = findNearestOption(hhmm, startTimes);
+    if (nearest) {
+      setSelectedStart(nearest);
+      Alert.alert('Adjusted', `Adjusted to nearest available time: ${nearest}`);
+    }
+  };
+
+  const onTimePicked = (event: DateTimePickerEvent, selected?: Date) => {
+    setTimePicker((prev) => {
+      if (!selected) {
+        return { ...prev, visible: Platform.OS !== 'ios' ? false : prev.visible };
+      }
+      const snapped = roundToStep(selected, 30);
+      if (Platform.OS === 'ios') {
+        return { ...prev, value: snapped };
+      }
+      applyPickedTime(snapped);
+      return { ...prev, value: snapped, visible: false };
+    });
+  };
+
+  const confirmTimePicker = () => {
+    applyPickedTime(timePicker.value);
+    closeTimePicker();
+  };
+
   const addSlot = () => {
-    if (!withinRange(date, selectedStart, duration)) {
-      Alert.alert('Invalid time', 'Selected slot is outside allowed time range.');
+    if (isClosed) {
+      Alert.alert('Closed', 'Opening hours are closed for this day.');
+      return;
+    }
+
+    if (startTimes.length === 0) {
+      Alert.alert('No slots', 'No available time slots for the selected duration.');
+      return;
+    }
+
+    if (!withinRange(openM, allowedCloseM, selectedStart, duration)) {
+      Alert.alert('Invalid time', 'Selected slot is outside the allowed window.');
+      if (startTimes[0]) setSelectedStart(startTimes[0]);
       return;
     }
 
@@ -247,7 +408,9 @@ export default function CoachAvailabilityScreenBody({ navigation }: Props) {
             ) : null}
 
             <Text style={styles.coachAvailabilityInfoText}>
-              {isWeekend(date) ? 'Weekend: 9:00 AM – 1:00 PM' : 'Weekday: 9:00 AM – 6:00 PM'}
+              {isClosed
+                ? 'Closed: no availability for this day.'
+                : `Allowed window: ${dayHours.open} – ${toHHMM(Math.max(openM, allowedCloseM))}`}
             </Text>
           </View>
         </View>
@@ -267,22 +430,35 @@ export default function CoachAvailabilityScreenBody({ navigation }: Props) {
             <View style={styles.coachAvailabilityCardHeaderRow} />
 
             <Text style={styles.inputLabel}>Start time</Text>
-            <View style={styles.pickerCard}>
-              <Picker selectedValue={selectedStart} onValueChange={v => setSelectedStart(String(v))}>
-                {startTimes.map(t => (
-                  <Picker.Item key={t} label={t} value={t} />
-                ))}
-              </Picker>
-            </View>
+            <TouchableOpacity
+              style={[
+                styles.secondaryButton,
+                { marginTop: 6, opacity: startTimes.length ? 1 : 0.6 },
+              ]}
+              onPress={openTimePicker}
+              disabled={startTimes.length === 0}
+            >
+              <Text style={styles.secondaryButtonText}>
+                ⏰ {selectedStart || 'Select start time'}
+              </Text>
+            </TouchableOpacity>
 
             <Text style={[styles.inputLabel, { marginTop: 12 }]}>Duration</Text>
-            <View style={styles.pickerCard}>
-              <Picker selectedValue={duration} onValueChange={v => setDuration(Number(v))}>
-                <Picker.Item label="30 mins" value={30} />
-                <Picker.Item label="60 mins" value={60} />
-                <Picker.Item label="90 mins" value={90} />
-                <Picker.Item label="120 mins" value={120} />
-              </Picker>
+            <View style={styles.pillRow}>
+              {[30, 60, 90, 120].map((d) => {
+                const active = duration === d;
+                return (
+                  <TouchableOpacity
+                    key={d}
+                    style={[styles.rolePill, active ? styles.rolePillActive : null]}
+                    onPress={() => setDuration(d)}
+                  >
+                    <Text style={[styles.rolePillText, active ? styles.rolePillTextActive : null]}>
+                      {d} mins
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             <TouchableOpacity style={[styles.secondaryButton, { marginTop: 12 }]} onPress={addSlot}>
@@ -290,6 +466,14 @@ export default function CoachAvailabilityScreenBody({ navigation }: Props) {
             </TouchableOpacity>
           </View>
         </View>
+
+        <TimePickerModal
+          visible={timePicker.visible}
+          value={timePicker.value}
+          onChange={onTimePicked}
+          onCancel={closeTimePicker}
+          onConfirm={confirmTimePicker}
+        />
 
         <View style={styles.dashboardSectionWrap}>
           <View style={styles.dashboardSectionHeader}>

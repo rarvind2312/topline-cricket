@@ -7,6 +7,7 @@ import CoachVideoReviewScreen from '../../screens/CoachVideoReviewScreen';
 import CoachFitnessScreen from '../../screens/CoachFitnessScreen';
 import CoachAvailabilityScreen from '../../screens/CoachAvailability';
 import CoachBookingRequestsScreen from '../../screens/CoachBookingRequest';
+import CoachBookLanesScreen from '../../screens/CoachBookLanesScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -18,6 +19,7 @@ export default function CoachStack() {
       <Stack.Screen name="CoachFitness" component={CoachFitnessScreen} />
      <Stack.Screen name="CoachAvailability" component={CoachAvailabilityScreen} />
      <Stack.Screen name="CoachBookingRequests" component={CoachBookingRequestsScreen} />
+     <Stack.Screen name="CoachBookLanes" component={CoachBookLanesScreen} />
     </Stack.Navigator>
   );   
 }

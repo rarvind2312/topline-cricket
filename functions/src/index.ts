@@ -1,8 +1,10 @@
 /* eslint-disable max-len */
 
 import {initializeApp} from "firebase-admin/app";
-import {getFirestore} from "firebase-admin/firestore";
+import {getFirestore, FieldValue} from "firebase-admin/firestore";
+import {getAuth} from "firebase-admin/auth";
 import {onDocumentCreated, onDocumentUpdated} from "firebase-functions/v2/firestore";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import {Expo} from "expo-server-sdk";
 import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 
@@ -12,6 +14,9 @@ const db = getFirestore();
 const expo = new Expo();
 
 type AnyRecord = Record<string, unknown>;
+const MAX_REQUESTS_PER_DAY = 5;
+const MAX_TOKENS_PER_DAY = 5000;
+const MAX_OUTPUT_TOKENS = 300;
 
 /**
  * Coerce unknown Firestore data into a plain object map.
@@ -59,6 +64,21 @@ function timeToMinutes(hhmm: string): number {
 }
 
 /**
+ * Build epoch ms from "YYYY-MM-DD" + "HH:mm" in server local time.
+ * @param {string} dateStr date
+ * @param {string} timeStr time
+ * @return {number} epoch ms or 0
+ */
+function parseSessionStartMs(dateStr: string, timeStr: string): number {
+  const [y, mo, da] = String(dateStr || "").split("-").map(Number);
+  const [h, mi] = String(timeStr || "").split(":").map(Number);
+  if (!y || !mo || !da || Number.isNaN(h) || Number.isNaN(mi)) return 0;
+  const d = new Date(y, mo - 1, da, h, mi, 0, 0);
+  const ms = d.getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+/**
  * Build display name from profile.
  * @param {Record<string, unknown>} obj profile
  * @param {string} fallback fallback label
@@ -69,6 +89,70 @@ function displayName(obj: AnyRecord, fallback = "User"): string {
   const ln = getString(obj, "lastName").trim();
   const full = `${fn} ${ln}`.trim();
   return full || getString(obj, "email") || fallback;
+}
+
+/**
+ * Require callable admin.
+ * @param {any} request callable request
+ */
+function requireAdminRequest(request: any): void {
+  const isAdmin = Boolean(request?.auth?.token?.admin);
+  if (!request?.auth || !isAdmin) {
+    throw new HttpsError("permission-denied", "Admin access required.");
+  }
+}
+
+/**
+ * Merge existing custom claims with next values.
+ * @param {Record<string, unknown>|undefined} existing existing claims
+ * @param {Record<string, unknown>} next next claims
+ * @return {Record<string, unknown>} merged claims
+ */
+function mergeClaims(
+  existing: Record<string, unknown> | undefined,
+  next: Record<string, unknown>
+): Record<string, unknown> {
+  return {...(existing || {}), ...next};
+}
+
+/**
+ * Update /users and /publicUsers role for admin changes.
+ * @param {string} uid target user uid
+ * @param {string} newRole role to set (admin/coach/player/parent)
+ * @param {boolean} storeRoleBefore store previous role if needed
+ * @return {Promise<void>}
+ */
+async function upsertUserRole(uid: string, newRole: string, storeRoleBefore: boolean) {
+  const userRef = db.collection("users").doc(uid);
+  const userSnap = await userRef.get();
+  const userData = asRecord(userSnap.exists ? userSnap.data() : null);
+  const currentRole = getString(userData, "role").trim().toLowerCase();
+
+  const updates: AnyRecord = {
+    updatedAtMs: Date.now(),
+    updatedAtServer: FieldValue.serverTimestamp(),
+  };
+
+  if (newRole) updates["role"] = newRole;
+
+  if (storeRoleBefore && currentRole && currentRole !== "admin" && !getString(userData, "roleBeforeAdmin")) {
+    updates["roleBeforeAdmin"] = currentRole;
+  }
+
+  await userRef.set(updates, {merge: true});
+
+  const publicRef = db.collection("publicUsers").doc(uid);
+  const publicUpdates: AnyRecord = {
+    role: newRole,
+    updatedAtMs: Date.now(),
+  };
+  const firstName = getString(userData, "firstName").trim();
+  const lastName = getString(userData, "lastName").trim();
+  const avatarUrl = getString(userData, "avatarUrl").trim();
+  if (firstName) publicUpdates["firstName"] = firstName;
+  if (lastName) publicUpdates["lastName"] = lastName;
+  if (avatarUrl) publicUpdates["avatarUrl"] = avatarUrl;
+  await publicRef.set(publicUpdates, {merge: true});
 }
 
 /**
@@ -93,6 +177,16 @@ function ageFromDob(dobStr: string): number | null {
   const mDiff = now.getMonth() - d.getMonth();
   if (mDiff < 0 || (mDiff === 0 && now.getDate() < d.getDate())) age -= 1;
   return age > 0 && age < 120 ? age : null;
+}
+
+/**
+ * Rough token estimate (chars / 4).
+ * @param {string} text input
+ * @return {number} estimated tokens
+ */
+function estimateTokens(text: string): number {
+  const len = String(text || "").length;
+  return Math.max(1, Math.ceil(len / 4));
 }
 
 /**
@@ -161,38 +255,12 @@ export const askAiForPlayer = onCall({secrets: ["OPENAI_API_KEY"]}, async (reque
     throw new HttpsError("failed-precondition", "OpenAI API key is not set.");
   }
 
-  const now = new Date();
-  const monthKey = now.toISOString().slice(0, 7); // YYYY-MM (UTC)
-  const usageRef = db.collection("aiUsage").doc(`${uid}_${monthKey}`);
-
-  let remaining = 0;
-  try {
-    await db.runTransaction(async (tx) => {
-      const snap = await tx.get(usageRef);
-      const count = snap.exists ? Number(snap.get("count") || 0) : 0;
-      if (count >= 5) {
-        throw new HttpsError(
-          "resource-exhausted",
-          "Monthly free limit reached."
-        );
-      }
-      const next = count + 1;
-      remaining = Math.max(0, 5 - next);
-      tx.set(
-        usageRef,
-        {
-          userId: uid,
-          month: monthKey,
-          count: next,
-          updatedAtMs: Date.now(),
-        },
-        {merge: true}
-      );
-    });
-  } catch (e) {
-    if (e instanceof HttpsError) throw e;
-    console.log("askAiForPlayer usage error:", e);
-    throw new HttpsError("internal", "Usage check failed.");
+  // Closed beta allowlist (server-side)
+  const testerSnap = await db.collection("betaTesters").doc(uid).get();
+  const tester = asRecord(testerSnap.data());
+  const testerEnabled = testerSnap.exists && tester["enabled"] !== false;
+  if (!testerEnabled) {
+    throw new HttpsError("permission-denied", "AI is in closed beta.");
   }
 
   const callerSnap = await db.collection("users").doc(uid).get();
@@ -400,6 +468,46 @@ export const askAiForPlayer = onCall({secrets: ["OPENAI_API_KEY"]}, async (reque
 
   const userPrompt = `Context:\n${contextSummary}\n\nQuestion:\n${question}`;
 
+  // Daily usage gating (requests + estimated tokens)
+  const now = new Date();
+  const dayKey = now.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+  const usageRef = db.collection("aiUsageDaily").doc(`${uid}_${dayKey}`);
+  let remaining = 0;
+
+  const estimatedInputTokens = estimateTokens(systemPrompt + "\n" + userPrompt);
+  const estimatedMaxTokens = estimatedInputTokens + MAX_OUTPUT_TOKENS;
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(usageRef);
+      const requests = snap.exists ? Number(snap.get("requests") || 0) : 0;
+      const tokens = snap.exists ? Number(snap.get("tokens") || 0) : 0;
+      if (requests >= MAX_REQUESTS_PER_DAY) {
+        throw new HttpsError("resource-exhausted", "Daily request limit reached.");
+      }
+      if (tokens + estimatedMaxTokens > MAX_TOKENS_PER_DAY) {
+        throw new HttpsError("resource-exhausted", "Daily token limit reached.");
+      }
+      const nextRequests = requests + 1;
+      remaining = Math.max(0, MAX_REQUESTS_PER_DAY - nextRequests);
+      tx.set(
+        usageRef,
+        {
+          userId: uid,
+          day: dayKey,
+          requests: nextRequests,
+          tokens,
+          updatedAtMs: Date.now(),
+        },
+        {merge: true}
+      );
+    });
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    console.log("askAiForPlayer daily usage error:", e);
+    throw new HttpsError("internal", "Usage check failed.");
+  }
+
   const resp = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -419,7 +527,7 @@ export const askAiForPlayer = onCall({secrets: ["OPENAI_API_KEY"]}, async (reque
         },
       ],
       temperature: 0.4,
-      max_output_tokens: 250,
+      max_output_tokens: MAX_OUTPUT_TOKENS,
     }),
   });
 
@@ -453,6 +561,35 @@ export const askAiForPlayer = onCall({secrets: ["OPENAI_API_KEY"]}, async (reque
     throw new HttpsError("internal", "AI returned an empty response.");
   }
 
+  // Update daily token usage (best-effort)
+  const usage = data?.usage || {};
+  const usageTotal =
+    typeof usage.total_tokens === "number" ? usage.total_tokens : 0;
+  const usageInput =
+    typeof usage.input_tokens === "number" ? usage.input_tokens : 0;
+  const usageOutput =
+    typeof usage.output_tokens === "number" ? usage.output_tokens : 0;
+  const estimatedOutputTokens = estimateTokens(answer);
+  let tokensUsed = usageTotal;
+  if (!tokensUsed) {
+    const sum = usageInput + usageOutput;
+    tokensUsed = sum > 0 ? sum : (estimatedInputTokens + estimatedOutputTokens);
+  }
+
+  try {
+    await usageRef.set(
+      {
+        userId: uid,
+        day: dayKey,
+        tokens: FieldValue.increment(tokensUsed),
+        updatedAtMs: Date.now(),
+      },
+      {merge: true}
+    );
+  } catch (e) {
+    console.log("askAiForPlayer token usage update failed:", e);
+  }
+
   await db.collection("aiConversations").add({
     userId: uid,
     role,
@@ -463,6 +600,116 @@ export const askAiForPlayer = onCall({secrets: ["OPENAI_API_KEY"]}, async (reque
   });
 
   return {answer, remaining};
+});
+
+/**
+ * ✅ Admin: grant admin claim by email (callable)
+ *
+ * @return {Function} callable
+ */
+export const grantAdminByEmail = onCall(async (request) => {
+  requireAdminRequest(request);
+
+  const email = String(request.data?.email || "").trim().toLowerCase();
+  if (!email) {
+    throw new HttpsError("invalid-argument", "Email is required.");
+  }
+
+  const auth = getAuth();
+  const user = await auth.getUserByEmail(email);
+
+  const mergedClaims = mergeClaims(user.customClaims || {}, {admin: true});
+  await auth.setCustomUserClaims(user.uid, mergedClaims);
+
+  await upsertUserRole(user.uid, "admin", true);
+
+  return {ok: true, uid: user.uid};
+});
+
+/**
+ * ✅ Admin: revoke admin claim by email (callable)
+ *
+ * @return {Function} callable
+ */
+export const revokeAdminByEmail = onCall(async (request) => {
+  requireAdminRequest(request);
+
+  const email = String(request.data?.email || "").trim().toLowerCase();
+  if (!email) {
+    throw new HttpsError("invalid-argument", "Email is required.");
+  }
+
+  const auth = getAuth();
+  const user = await auth.getUserByEmail(email);
+
+  const mergedClaims = mergeClaims(user.customClaims || {}, {admin: false});
+  await auth.setCustomUserClaims(user.uid, mergedClaims);
+
+  const userRef = db.collection("users").doc(user.uid);
+  const userSnap = await userRef.get();
+  const userData = asRecord(userSnap.exists ? userSnap.data() : null);
+
+  const currentRole = getString(userData, "role").trim().toLowerCase();
+  const roleBefore = getString(userData, "roleBeforeAdmin").trim().toLowerCase();
+  const canRestore =
+    currentRole === "admin" && (roleBefore === "coach" || roleBefore === "player" || roleBefore === "parent");
+
+  const updates: AnyRecord = {
+    updatedAtMs: Date.now(),
+    updatedAtServer: FieldValue.serverTimestamp(),
+  };
+
+  let nextRole = currentRole || "";
+
+  if (canRestore) {
+    updates["role"] = roleBefore;
+    updates["roleBeforeAdmin"] = FieldValue.delete();
+    nextRole = roleBefore;
+  }
+
+  await userRef.set(updates, {merge: true});
+
+  if (nextRole) {
+    const publicRef = db.collection("publicUsers").doc(user.uid);
+    await publicRef.set({role: nextRole, updatedAtMs: Date.now()}, {merge: true});
+  }
+
+  return {ok: true, uid: user.uid};
+});
+
+/**
+ * ✅ Admin: send emergency closure notification to all users
+ *
+ * @return {Function} callable
+ */
+export const sendEmergencyClosureNotification = onCall(async (request) => {
+  requireAdminRequest(request);
+
+  const message = String(request.data?.message || "").trim();
+  if (!message) {
+    throw new HttpsError("invalid-argument", "Message is required.");
+  }
+
+  const title = "Emergency Closure";
+  const usersSnap = await db.collection("users").get();
+
+  let sent = 0;
+  for (const d of usersSnap.docs) {
+    const user = asRecord(d.data());
+    const token = getString(user, "expoPushToken");
+    if (!token) continue;
+    try {
+      await sendPush(token, title, message, {
+        screen: "PlayerDashboard",
+        type: "closure",
+      });
+      sent += 1;
+    } catch (e) {
+      console.log("sendEmergencyClosureNotification failed for", d.id, e);
+    }
+  }
+
+  return {ok: true, sent};
 });
 
 /**
@@ -565,6 +812,50 @@ export const notifyPlayerOnFeedback = onDocumentUpdated(
 );
 
 /**
+ * 🔔 Coach shares markups on a player video → notify player
+ * Fires on UPDATE when markupsShared flips to true
+ *
+ * @return {Function} Firestore trigger
+ */
+export const notifyPlayerOnMarkupsShared = onDocumentUpdated(
+  "videos/{videoId}",
+  async (event) => {
+    const afterSnap = event.data?.after;
+    const beforeSnap = event.data?.before;
+    if (!afterSnap || !beforeSnap) return;
+
+    const after = asRecord(afterSnap.data());
+    const before = asRecord(beforeSnap.data());
+
+    if (getString(after, "uploadedBy") !== "player") return;
+
+    const beforeShared = Boolean(before["markupsShared"]);
+    const afterShared = Boolean(after["markupsShared"]);
+    if (beforeShared || !afterShared) return;
+
+    const playerId = getString(after, "playerId");
+    if (!playerId) return;
+
+    const playerSnap = await db.collection("users").doc(playerId).get();
+    const player = asRecord(playerSnap.data());
+    const token = getString(player, "expoPushToken");
+    if (!token) return;
+
+    const coachName = getString(after, "coachName") || "Coach";
+
+    await sendPush(
+      token,
+      "Video Markups Shared",
+      `${coachName} shared markups on your video`,
+      {
+        screen: "PlayerVideos",
+        videoId: afterSnap.id,
+      }
+    );
+  }
+);
+
+/**
  * ✅ Booking notifications
  * 1) Player raises booking request → notify coach
  *
@@ -660,20 +951,8 @@ export const notifyPlayerOnBookingUpdate = onDocumentUpdated(
     const token = getString(player, "expoPushToken");
     if (!token) return;
 
-    let title = "Session Update";
-    let body = "Your session request was updated.";
-
-    if (afterStatus === "accepted") {
-      title = "Session Accepted";
-      body = "Your coach Accepted your session request.";
-    } else if (afterStatus === "declined") {
-      title = "Session Declined";
-      body = "Your coach Declined the session request.";
-    } else if (afterStatus === "countered") {
-      title = "Session Counter Offer";
-      body = "Your coach suggested a new time.";
-    }
-
+    const title = "Session Update";
+    const body = "Your session request was updated.";
     await sendPush(token, title, body, {
       screen: "PlayerDashboard",
       requestId: afterSnap.id,
@@ -722,6 +1001,12 @@ export const syncSessionOnBookingAccepted = onDocumentUpdated(
 
     const coachName = getString(after, "coachName") || "Coach";
     const playerName = getString(after, "playerName") || "Player";
+    const requestedStartAtMs =
+      typeof after["startAtMs"] === "number" ? (after["startAtMs"] as number) : 0;
+    const requestedEndAtMs =
+      typeof after["endAtMs"] === "number" ? (after["endAtMs"] as number) : 0;
+    const startAtMs = requestedStartAtMs || parseSessionStartMs(date, slotStart);
+    const endAtMs = requestedEndAtMs || parseSessionStartMs(date, slotEnd);
 
     // Create session (idempotent)
     const sessionRef = db.collection("sessions").doc(afterSnap.id);
@@ -736,9 +1021,16 @@ export const syncSessionOnBookingAccepted = onDocumentUpdated(
         start: slotStart,
         end: slotEnd,
         status: "upcoming",
+        startAtMs: startAtMs || null,
+        endAtMs: endAtMs || null,
         createdAtMs: Date.now(),
         createdAtLabel: new Date().toLocaleString(),
         requestId: afterSnap.id,
+      });
+    } else if (startAtMs && !sessionSnap.get("startAtMs")) {
+      await sessionRef.update({
+        startAtMs,
+        endAtMs: endAtMs || null,
       });
     }
 
@@ -794,6 +1086,7 @@ export const syncSessionOnBookingAccepted = onDocumentUpdated(
  * @return {Function} HTTPS handler
  */
 const BACKFILL_KEY = "nihcasdnivraakihtirk";
+const SEED_BETA_KEY = BACKFILL_KEY;
 
 export const backfillPublicUsers = onRequest(async (req, res) => {
   try {
@@ -859,6 +1152,112 @@ export const backfillPublicUsers = onRequest(async (req, res) => {
     res.status(500).json({ok: false, error: msg});
   }
 });
+
+/**
+ * Seed beta testers (auth + users + publicUsers + betaTesters).
+ * One-time use: call with x-seed-key header.
+ *
+ * Body:
+ * { testers: [{ email, password, firstName, lastName, role }] }
+ */
+export const seedBetaTesters = onRequest(async (req, res) => {
+  try {
+    const provided = String(req.headers["x-seed-key"] || req.query.key || "");
+    if (provided !== SEED_BETA_KEY) {
+      res.status(403).send("Forbidden");
+      return;
+    }
+    if (req.method !== "POST") {
+      res.status(405).send("Use POST");
+      return;
+    }
+
+    const body =
+      typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const testers = Array.isArray(body?.testers) ? body.testers : [];
+    if (!testers.length) {
+      res.status(400).send("Missing testers array.");
+      return;
+    }
+
+    const auth = getAuth();
+    const results: Array<{email: string; uid: string; role: string; created: boolean}> = [];
+
+    for (const t of testers) {
+      const email = String(t?.email || "").trim().toLowerCase();
+      const password = String(t?.password || "").trim();
+      const firstName = String(t?.firstName || "").trim() || "User";
+      const lastName = String(t?.lastName || "").trim();
+      const roleRaw = String(t?.role || "player").trim().toLowerCase();
+      const role = roleRaw === "coach" || roleRaw === "parent" ? roleRaw : "player";
+
+      if (!email || !password) continue;
+
+      let created = false;
+      let user;
+      try {
+        user = await auth.getUserByEmail(email);
+      } catch (e: any) {
+        user = await auth.createUser({
+          email,
+          password,
+          displayName: `${firstName} ${lastName}`.trim(),
+          emailVerified: true,
+        });
+        created = true;
+      }
+
+      const uid = user.uid;
+      const userRef = db.collection("users").doc(uid);
+      const userSnap = await userRef.get();
+      const existing = asRecord(userSnap.data());
+      const nowIso = new Date().toISOString();
+      const createdAt = getString(existing, "createdAt") || nowIso;
+
+      await userRef.set(
+        {
+          uid,
+          role,
+          firstName,
+          lastName,
+          email,
+          createdAt,
+          updatedAt: nowIso,
+          updatedAtMs: Date.now(),
+        },
+        {merge: true}
+      );
+
+      await db.collection("publicUsers").doc(uid).set(
+        {
+          firstName,
+          lastName,
+          role,
+          updatedAtMs: Date.now(),
+        },
+        {merge: true}
+      );
+
+      await db.collection("betaTesters").doc(uid).set(
+        {
+          enabled: true,
+          email,
+          role,
+          addedAtMs: Date.now(),
+        },
+        {merge: true}
+      );
+
+      results.push({email, uid, role, created});
+    }
+
+    res.status(200).json({ok: true, count: results.length, results});
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.log("seedBetaTesters error:", msg);
+    res.status(500).json({ok: false, error: msg});
+  }
+});
 /**
  * 🔔 Coach assigns fitness drill → notify player
  */
@@ -914,3 +1313,275 @@ export const notifyPlayerOnSessionConfirmed =
       }
     );
   });
+
+/**
+ * 🔔 Lane booking created → notify admin + relevant users
+ */
+export const notifyOnLaneBookingCreated =
+  onDocumentCreated("laneBookings/{bookingId}", async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const booking = asRecord(snap.data());
+    const bookingType = getString(booking, "bookingType");
+    const laneName = getString(booking, "laneName") || "Lane";
+    const date = getString(booking, "date");
+    const start = getString(booking, "start");
+    const end = getString(booking, "end");
+    const playerId = getString(booking, "playerId");
+    const coachId = getString(booking, "coachId");
+    const playerName = getString(booking, "playerName") || "Player";
+    const coachName = getString(booking, "coachName") || "Coach";
+
+    const detail = `${laneName} • ${date} ${start}-${end}`;
+
+    if (playerId) {
+      const playerSnap = await db.collection("users").doc(playerId).get();
+      const player = asRecord(playerSnap.data());
+      const token = getString(player, "expoPushToken");
+      if (token) {
+        await sendPush(
+          token,
+          "Lane Booked",
+          bookingType === "coaching"? `Lane booked for coaching: ${detail}`: `Lane booked: ${detail}`,
+          {
+            screen: "PlayerDashboard",
+            laneBookingId: snap.id,
+          }
+        );
+      }
+    }
+
+    if (bookingType === "coaching" && coachId) {
+      const coachSnap = await db.collection("users").doc(coachId).get();
+      const coach = asRecord(coachSnap.data());
+      const token = getString(coach, "expoPushToken");
+      if (token) {
+        await sendPush(
+          token,
+          "Lane Booked",
+          `Lane booked for ${playerName}: ${detail}`,
+          {
+            screen: "CoachDashboard",
+            laneBookingId: snap.id,
+          }
+        );
+      }
+    }
+
+    const adminsSnap = await db.collection("users").where("role", "==", "admin").get();
+    const adminBody =
+      bookingType === "coaching"? `${coachName} booked ${laneName} for ${playerName} (${date} ${start}-${end})`: `${playerName} booked ${laneName} (${date} ${start}-${end})`;
+    for (const d of adminsSnap.docs) {
+      const admin = asRecord(d.data());
+      const token = getString(admin, "expoPushToken");
+      if (!token) continue;
+      await sendPush(token, "Lane Booking", adminBody, {
+        screen: "AdminLaneBookings",
+        laneBookingId: snap.id,
+      });
+    }
+
+    const sessionId = getString(booking, "sessionId");
+    if (sessionId) {
+      await db.collection("sessions").doc(sessionId).set(
+        {
+          laneId: getString(booking, "laneId"),
+          laneName: getString(booking, "laneName"),
+          laneType: getString(booking, "laneType"),
+        },
+        {merge: true}
+      );
+    }
+  });
+
+/**
+ * 🔔 Lane booking updated → notify player/coach + sync session lane
+ */
+export const notifyOnLaneBookingUpdated =
+  onDocumentUpdated("laneBookings/{bookingId}", async (event) => {
+    const afterSnap = event.data?.after;
+    const beforeSnap = event.data?.before;
+    if (!afterSnap || !beforeSnap) return;
+
+    const after = asRecord(afterSnap.data());
+    const before = asRecord(beforeSnap.data());
+
+    const laneIdAfter = getString(after, "laneId");
+    const laneIdBefore = getString(before, "laneId");
+    const laneNameAfter = getString(after, "laneName");
+    const laneNameBefore = getString(before, "laneName");
+    const startAfter = getString(after, "start");
+    const startBefore = getString(before, "start");
+    const endAfter = getString(after, "end");
+    const endBefore = getString(before, "end");
+
+    const changed =
+      laneIdAfter !== laneIdBefore ||
+      laneNameAfter !== laneNameBefore ||
+      startAfter !== startBefore ||
+      endAfter !== endBefore;
+    if (!changed) return;
+
+    const laneLabel = laneNameAfter || laneIdAfter || "Lane";
+    const date = getString(after, "date");
+    const detail = `${laneLabel} • ${date} ${startAfter}-${endAfter}`;
+
+    const playerId = getString(after, "playerId");
+    if (playerId) {
+      const playerSnap = await db.collection("users").doc(playerId).get();
+      const player = asRecord(playerSnap.data());
+      const token = getString(player, "expoPushToken");
+      if (token) {
+        await sendPush(token, "Lane Updated", `Your lane booking was updated: ${detail}`, {
+          screen: "PlayerDashboard",
+          laneBookingId: afterSnap.id,
+        });
+      }
+    }
+
+    const coachId = getString(after, "coachId");
+    if (coachId) {
+      const coachSnap = await db.collection("users").doc(coachId).get();
+      const coach = asRecord(coachSnap.data());
+      const token = getString(coach, "expoPushToken");
+      if (token) {
+        await sendPush(token, "Lane Updated", `Lane updated for your session: ${detail}`, {
+          screen: "CoachDashboard",
+          laneBookingId: afterSnap.id,
+        });
+      }
+    }
+
+    const sessionId = getString(after, "sessionId");
+    if (sessionId) {
+      await db.collection("sessions").doc(sessionId).set(
+        {
+          laneId: laneIdAfter,
+          laneName: laneNameAfter,
+          laneType: getString(after, "laneType"),
+        },
+        {merge: true}
+      );
+    }
+  });
+
+/**
+ * 🔔 Admin notified when a session is booked
+ */
+export const notifyAdminsOnSessionBooked =
+  onDocumentCreated("sessions/{sessionId}", async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const session = asRecord(snap.data());
+    if (getString(session, "status") !== "upcoming") return;
+
+    const date = getString(session, "date");
+    const start = getString(session, "start");
+    const end = getString(session, "end");
+    const playerName = getString(session, "playerName") || "Player";
+    const coachName = getString(session, "coachName") || "Coach";
+
+    const adminsSnap = await db.collection("users").where("role", "==", "admin").get();
+    if (adminsSnap.empty) return;
+
+    const body = `${playerName} booked ${coachName} (${date} ${start}-${end})`;
+
+    for (const d of adminsSnap.docs) {
+      const admin = asRecord(d.data());
+      const token = getString(admin, "expoPushToken");
+      if (!token) continue;
+      await sendPush(token, "New Session Booking", body, {
+        screen: "AdminAccess",
+        sessionId: snap.id,
+      });
+    }
+  });
+
+/**
+ * 🔔 Notify player + coach if lane changes on a session
+ */
+
+/**
+ * 🔔 Session reminders (60min + 30min)
+ * Runs every 5 minutes and sends reminders to coach + player.
+ */
+export const sendSessionReminders = onSchedule("every 5 minutes", async () => {
+  const nowMs = Date.now();
+  const windowMs = 5 * 60 * 1000;
+  const sessionsSnap = await db
+    .collection("sessions")
+    .where("status", "==", "upcoming")
+    .limit(500)
+    .get();
+
+  if (sessionsSnap.empty) return;
+
+  const userCache = new Map<string, AnyRecord>();
+  const getUser = async (uid: string): Promise<AnyRecord> => {
+    if (userCache.has(uid)) return userCache.get(uid) as AnyRecord;
+    const snap = await db.collection("users").doc(uid).get();
+    const data = asRecord(snap.data());
+    userCache.set(uid, data);
+    return data;
+  };
+
+  const targets = [
+    {minutes: 60, field: "reminder60SentAtMs"},
+    {minutes: 30, field: "reminder30SentAtMs"},
+  ];
+
+  for (const docSnap of sessionsSnap.docs) {
+    const session = asRecord(docSnap.data());
+    const playerId = getString(session, "playerId");
+    const coachId = getString(session, "coachId");
+    if (!playerId || !coachId) continue;
+
+    const date = getString(session, "date");
+    const start = getString(session, "start");
+    const end = getString(session, "end");
+    const startAtMs =
+      typeof session["startAtMs"] === "number" ? (session["startAtMs"] as number) : parseSessionStartMs(date, start);
+    if (!startAtMs) continue;
+
+    const diffMs = startAtMs - nowMs;
+    if (diffMs <= 0 || diffMs > 70 * 60 * 1000) continue;
+
+    for (const t of targets) {
+      const already = typeof session[t.field] === "number" && (session[t.field] as number) > 0;
+      if (already) continue;
+      const targetMs = t.minutes * 60 * 1000;
+      if (Math.abs(diffMs - targetMs) > windowMs) continue;
+
+      const [coach, player] = await Promise.all([getUser(coachId), getUser(playerId)]);
+      const coachToken = getString(coach, "expoPushToken");
+      const playerToken = getString(player, "expoPushToken");
+
+      const coachName = getString(session, "coachName") || displayName(coach, "Coach");
+      const playerName = getString(session, "playerName") || displayName(player, "Player");
+
+      const timeLabel = start && end ? `${start}-${end}` : start || "soon";
+      const title = "Session Reminder";
+      const playerBody = `Your session with ${coachName} starts in ${t.minutes} minutes (${timeLabel}).`;
+      const coachBody = `Your session with ${playerName} starts in ${t.minutes} minutes (${timeLabel}).`;
+
+      if (playerToken) {
+        await sendPush(playerToken, title, playerBody, {
+          screen: "PlayerDashboard",
+          sessionId: docSnap.id,
+        });
+      }
+      if (coachToken) {
+        await sendPush(coachToken, title, coachBody, {
+          screen: "CoachDashboard",
+          sessionId: docSnap.id,
+        });
+      }
+
+      await docSnap.ref.update({
+        [t.field]: Date.now(),
+      });
+    }
+  }
+});

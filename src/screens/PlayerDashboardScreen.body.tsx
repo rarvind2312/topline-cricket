@@ -35,10 +35,12 @@ const TOPLINE_LOGO = require('../../assets/topline-cricket-image.jpg');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PlayerDashboard'>;
 
-type UpcomingSession = {
+type UpcomingItem = {
   id: string;
+  kind: 'coaching' | 'training';
   skill?: string;
   coachName?: string;
+  laneName?: string;
   date?: string; // YYYY-MM-DD
   start?: string; // HH:mm
   end?: string; // HH:mm
@@ -88,20 +90,39 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
     return (profile as any)?.playerType?.trim() || 'All Rounder';
   }, [profile]);
 
+  const todayKey = useMemo(() => toLocalDateKey(new Date()), []);
+
   // -----------------------------
   // Upcoming session + recent feedback (Firestore)
   // -----------------------------
-  const [upcoming, setUpcoming] = useState<UpcomingSession | null>(null);
+  const [upcomingSession, setUpcomingSession] = useState<UpcomingItem | null>(null);
+  const [upcomingLane, setUpcomingLane] = useState<UpcomingItem | null>(null);
   const [recentFeedback, setRecentFeedback] = useState<RecentFeedback | null>(null);
-  const [loadingUpcoming, setLoadingUpcoming] = useState(false);
+  const [loadingUpcomingSession, setLoadingUpcomingSession] = useState(false);
+  const [loadingUpcomingLane, setLoadingUpcomingLane] = useState(false);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
+
+  const loadingUpcoming = loadingUpcomingSession || loadingUpcomingLane;
+  const upcoming = useMemo(() => {
+    if (!upcomingSession && !upcomingLane) return null;
+    if (!upcomingSession) return upcomingLane;
+    if (!upcomingLane) return upcomingSession;
+
+    const sDt = parseSessionStartLocal(upcomingSession.date, upcomingSession.start);
+    const lDt = parseSessionStartLocal(upcomingLane.date, upcomingLane.start);
+    const sMs = sDt?.getTime?.() ?? Number.POSITIVE_INFINITY;
+    const lMs = lDt?.getTime?.() ?? Number.POSITIVE_INFINITY;
+
+    if (sMs === lMs) return upcomingSession;
+    return lMs < sMs ? upcomingLane : upcomingSession;
+  }, [upcomingSession, upcomingLane]);
 
   useEffect(() => {
     if (!uid) return;
 
     // ✅ Upcoming Session — from sessions (date/start/end/status)
     const loadUpcomingFromSessions = () => {
-      setLoadingUpcoming(true);
+      setLoadingUpcomingSession(true);
 
       const sessionsRef = collection(db, 'sessions');
       const q = query(sessionsRef, where('playerId', '==', uid), limit(300));
@@ -115,7 +136,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
           const candidate = docs
             .filter((s) => {
               const st = String(s.status || '').trim().toLowerCase();
-              return st === 'upcoming' || st === 'scheduled';
+              return (st === 'upcoming' || st === 'scheduled') && s.date === todayKey;
             })
             .map((s) => {
               const startDt = parseSessionStartLocal(s.date, s.start);
@@ -124,10 +145,11 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
             .filter((s) => !!s._startDt && s._startDt.getTime() >= nowMs)
             .sort((a, b) => a._startDt.getTime() - b._startDt.getTime())[0];
 
-          setUpcoming(
+          setUpcomingSession(
             candidate
               ? {
                   id: candidate.id,
+                  kind: 'coaching',
                   coachName: candidate.coachName,
                   skill: candidate.skill,
                   date: candidate.date,
@@ -138,12 +160,67 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
               : null
           );
 
-          setLoadingUpcoming(false);
+          setLoadingUpcomingSession(false);
         },
         (e) => {
           console.warn('Upcoming sessions listener failed', e);
-          setUpcoming(null);
-          setLoadingUpcoming(false);
+          setUpcomingSession(null);
+          setLoadingUpcomingSession(false);
+        }
+      );
+
+      return unsub;
+    };
+
+    const loadUpcomingFromLaneBookings = () => {
+      setLoadingUpcomingLane(true);
+
+      const bookingsRef = collection(db, 'laneBookings');
+      const q = query(bookingsRef, where('playerId', '==', uid), limit(300));
+
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+          const nowMs = Date.now();
+
+          const candidate = docs
+            .filter(
+              (b) => String(b.status || '').toLowerCase() !== 'cancelled' && b.date === todayKey
+            )
+            .map((b) => {
+              const startDt = parseSessionStartLocal(b.date, b.start);
+              return { ...b, _startDt: startDt };
+            })
+            .filter((b) => !!b._startDt && b._startDt.getTime() >= nowMs)
+            .sort((a, b) => a._startDt.getTime() - b._startDt.getTime())[0];
+
+          const kind =
+            String(candidate?.bookingType || '').toLowerCase() === 'training'
+              ? 'training'
+              : 'coaching';
+
+          setUpcomingLane(
+            candidate
+              ? {
+                  id: candidate.id,
+                  kind,
+                  coachName: candidate.coachName,
+                  laneName: candidate.laneName,
+                  date: candidate.date,
+                  start: candidate.start,
+                  end: candidate.end,
+                  status: candidate.status,
+                }
+              : null
+          );
+
+          setLoadingUpcomingLane(false);
+        },
+        (e) => {
+          console.warn('Upcoming lane bookings listener failed', e);
+          setUpcomingLane(null);
+          setLoadingUpcomingLane(false);
         }
       );
 
@@ -289,13 +366,32 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
     };
 
     const unsubUpcoming = loadUpcomingFromSessions();
+    const unsubUpcomingLanes = loadUpcomingFromLaneBookings();
     const unsubFeedback = loadRecentFeedbackCombined();
 
     return () => {
       try { unsubUpcoming?.(); } catch {}
+      try { unsubUpcomingLanes?.(); } catch {}
       try { unsubFeedback?.(); } catch {}
     };
-  }, [uid]);
+  }, [uid, todayKey]);
+
+  const upcomingTypeLabel = upcoming?.kind === 'training' ? 'SELF TRAINING' : 'COACHING';
+  const upcomingTypeStyle =
+    upcoming?.kind === 'training' ? styles.statusBadgeRequested : styles.statusBadgeAccepted;
+  const upcomingLeftLabel =
+    upcoming?.kind === 'training'
+      ? `🛣️ ${upcoming?.laneName || 'Lane'}`
+      : `👤 ${String(upcoming?.coachName || 'Coach')}`;
+  const upcomingDateLabel = upcoming?.date
+    ? formatDayDateFromYYYYMMDD(upcoming.date)
+    : '—';
+  const upcomingTimeLabel = upcoming?.start
+    ? upcoming?.end
+      ? `${upcoming.start}–${upcoming.end}`
+      : upcoming.start
+    : '';
+  const upcomingDateTime = `${upcomingDateLabel}${upcomingTimeLabel ? ` ${upcomingTimeLabel}` : ''}`.trim();
 
   // -----------------------------
   // Stats (manual entry; saved to Firestore)
@@ -464,17 +560,26 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
         const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
         rows.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
 
+        const nowMs = Date.now();
         const visible = rows.filter((r) => {
           const st = String(r.status || '').toLowerCase();
           const dateKey = String(r.date || '');
           const todayKey = toLocalDateKey(new Date());
+          const startAtMs =
+            typeof r.startAtMs === 'number'
+              ? r.startAtMs
+              : parseSessionStartLocal(dateKey, r.slotStart)?.getTime() ?? null;
 
           if (st === 'requested' || st === 'countered') {
-            return !dateKey || dateKey >= todayKey;
+            if (!dateKey) return false;
+            if (dateKey > todayKey) return true;
+            if (dateKey < todayKey) return false;
+            return typeof startAtMs === 'number' ? startAtMs >= nowMs : true;
           }
 
           if (st === 'accepted' || st === 'declined') {
-            return !!dateKey && dateKey === todayKey;
+            if (!dateKey || dateKey !== todayKey) return false;
+            return typeof startAtMs === 'number' ? startAtMs >= nowMs : true;
           }
 
           return false;
@@ -522,7 +627,7 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
               <View style={styles.dashboardSectionIconWrap}>
                 <Text style={styles.dashboardSectionIcon}>🗓️</Text>
               </View>
-              <Text style={styles.dashboardSectionTitle}>Upcoming Session</Text>
+              <Text style={styles.dashboardSectionTitle}>Today's Session</Text>
             </View>
           </View>
           <View style={styles.dashboardSectionDivider} />
@@ -546,26 +651,26 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
             </View>
           ) : upcoming ? (
             <View style={styles.toplineSectionCard}>
+              <View style={[styles.statusBadge, upcomingTypeStyle, { marginBottom: 10 }]}>
+                <Text style={styles.statusBadgeText}>{upcomingTypeLabel}</Text>
+              </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={[styles.playerPill, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
                   <Text style={styles.playerPillText} numberOfLines={1}>
-                    👤 {String(upcoming.coachName || '—')}
+                    {upcomingLeftLabel}
                   </Text>
                 </View>
 
                 <View style={[styles.playerPill, styles.playerPillTall, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}>
                   <Text style={styles.playerPillTextSm} numberOfLines={2}>
-                    🗓{' '}
-                    {upcoming.date
-                      ? `${formatDayDateFromYYYYMMDD(upcoming.date)} ${upcoming.start ?? ''}`.trim()
-                      : '—'}
+                    🗓 {upcomingDateTime || '—'}
                   </Text>
                 </View>
               </View>
             </View>
           ) : (
             <View style={styles.toplineSectionCard}>
-              <Text style={styles.emptyBody}>No Upcoming Sessions yet.</Text>
+              <Text style={styles.emptyBody}>No sessions today.</Text>
             </View>
           )}
         </View>
@@ -1063,6 +1168,15 @@ export default function PlayerDashboardScreenBody({ navigation }: Props) {
           </View>
         </Modal>
       </ScrollView>
+
+      <TouchableOpacity
+        style={styles.floatingLaneButton}
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('PlayerBookLanes')}
+      >
+        <Text style={styles.floatingLaneButtonIcon}>🛣️</Text>
+        <Text style={styles.floatingLaneButtonText}>Book Lane</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }

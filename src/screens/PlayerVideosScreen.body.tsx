@@ -5,7 +5,7 @@
 // ❌ NO coaching videos here
 // ❌ NO toggle here
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -16,19 +16,22 @@ import {
   Modal,
   TextInput,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
+import { Video, ResizeMode, AVPlaybackStatus, VideoReadyForDisplayEvent } from 'expo-av';
 
-import type { RootStackParamList, PlayerVideoItem } from '../types';
+import type { RootStackParamList, PlayerVideoItem, VideoOverlay } from '../types';
 import { styles } from '../styles/styles';
 
 import { useAuth } from '../context/AuthContext';
 import { db, storage, serverTimestamp } from '../firebase';
 import { askAI } from '../services/askAI';
 import { updateUserProfile } from '../services/userProfile';
+import VideoOverlayLayer from '../components/VideoOverlayLayer';
+import { listenVideoOverlays } from '../services/videoOverlays';
 
 
 import {
@@ -98,6 +101,40 @@ const PlayerVideosScreen: React.FC<PlayerVideosProps> = ({ navigation }) => {
     !String((profile as any)?.weightKg || '').trim() ||
     !String((profile as any)?.battingHand || '').trim() ||
     !String((profile as any)?.bowlingHand || '').trim();
+
+  // Markups (player)
+  const overlayVideoRef = useRef<Video>(null);
+  const [overlayVisible, setOverlayVisible] = useState(false);
+  const [overlayVideo, setOverlayVideo] = useState<any | null>(null);
+  const [overlayItems, setOverlayItems] = useState<VideoOverlay[]>([]);
+  const [overlayMs, setOverlayMs] = useState(0);
+  const [overlaySize, setOverlaySize] = useState({ w: 0, h: 0 });
+  const [overlayVideoSize, setOverlayVideoSize] = useState<{
+    width: number;
+    height: number;
+    orientation: 'portrait' | 'landscape';
+  } | null>(null);
+
+  const { width: windowWidth } = useWindowDimensions();
+  const overlayStageWidth = useMemo(() => Math.max(0, windowWidth - 36), [windowWidth]);
+  const overlayStageHeight = useMemo(() => {
+    const aspect =
+      overlayVideoSize && overlayVideoSize.width && overlayVideoSize.height
+        ? overlayVideoSize.width / overlayVideoSize.height
+        : 16 / 9;
+    return Math.round(overlayStageWidth / aspect);
+  }, [overlayStageWidth, overlayVideoSize]);
+  const overlayStageStyle = useMemo(
+    () => [
+      styles.videoStage,
+      {
+        width: overlayStageWidth,
+        height: overlayStageHeight,
+        alignSelf: 'center',
+      },
+    ],
+    [overlayStageWidth, overlayStageHeight]
+  );
 
  // ✅ Coaches loaded ONLY from Firestore publicUsers(role=coach)
 useEffect(() => {
@@ -179,6 +216,49 @@ useEffect(() => {
 
   const coachNameById = (coachId: string) => {
     return coaches.find((c) => c.id === coachId)?.name ?? '';
+  };
+
+  useEffect(() => {
+    if (!overlayVisible || !overlayVideo?.id) {
+      setOverlayItems([]);
+      return;
+    }
+    const unsub = listenVideoOverlays(overlayVideo.id, (doc) => {
+      setOverlayItems(doc?.overlays || []);
+    });
+    return () => unsub();
+  }, [overlayVisible, overlayVideo?.id]);
+
+  const openOverlay = (v: any) => {
+    if (!v?.videoUrl) {
+      Alert.alert('No video', 'Video URL missing.');
+      return;
+    }
+    setOverlayVideo(v);
+    setOverlayMs(0);
+    setOverlayVideoSize(null);
+    setOverlayVisible(true);
+  };
+
+  const closeOverlay = () => {
+    setOverlayVisible(false);
+    setOverlayVideo(null);
+    setOverlayItems([]);
+    setOverlayVideoSize(null);
+  };
+
+  const onOverlayStatus = (status: AVPlaybackStatus) => {
+    if (!status.isLoaded) return;
+    setOverlayMs(status.positionMillis || 0);
+  };
+
+  const onOverlayReadyForDisplay = (event: VideoReadyForDisplayEvent) => {
+    const { width, height, orientation } = event.naturalSize || {};
+    if (!width || !height) return;
+    setOverlayVideoSize((prev) => {
+      if (prev && prev.width === width && prev.height === height) return prev;
+      return { width, height, orientation };
+    });
   };
 
   const openAskAI = () => {
@@ -305,7 +385,7 @@ useEffect(() => {
     setVideos((prev) =>
       prev.map((v: any, i: number) => {
         if (i !== index) return v;
-        if (v.status === 'shared') return v;
+        if (v.status === 'shared' || v.status === 'sharing') return v;
         return { ...v, coachId };
       })
     );
@@ -315,7 +395,7 @@ useEffect(() => {
     setVideos((prev: any[]) =>
       prev.map((v, i) => {
         if (i !== index) return v;
-        if (v.status === 'shared') return v;
+        if (v.status === 'shared' || v.status === 'sharing') return v;
         return { ...v, acceptedPolicy: !v.acceptedPolicy };
       })
     );
@@ -328,6 +408,9 @@ useEffect(() => {
 
     if (v.status === 'shared') {
       Alert.alert('Already shared', 'This video is already shared and cannot be changed.');
+      return;
+    }
+    if (v.status === 'sharing') {
       return;
     }
 
@@ -348,6 +431,10 @@ useEffect(() => {
       );
       return;
     }
+
+    setVideos((prev: any[]) =>
+      prev.map((item, i) => (i === index ? { ...item, status: 'sharing' } : item))
+    );
 
     try {
       const blob = await uriToBlob(v.uri);
@@ -412,6 +499,9 @@ useEffect(() => {
         'Upload failed',
         e?.message || e?.code || 'Firebase Storage: An unknown error occurred. (storage/unknown)'
       );
+      setVideos((prev: any[]) =>
+        prev.map((item, i) => (i === index ? { ...item, status: 'draft' } : item))
+      );
     }
   };
 
@@ -454,6 +544,7 @@ useEffect(() => {
             <View style={{ marginTop: 16 }}>
               {videos.map((video: any, index) => {
                 const isShared = video.status === 'shared';
+                const isSharing = video.status === 'sharing';
                 const coachName = coachNameById(video.coachId);
 
                 return (
@@ -475,7 +566,7 @@ useEffect(() => {
 
                     <View style={styles.pickerCard}>
                       <Picker
-                        enabled={!isShared && !loadingCoaches}
+                        enabled={!isShared && !isSharing && !loadingCoaches}
                         selectedValue={video.coachId}
                         onValueChange={(value) => setCoachForVideo(index, String(value))}
                       >
@@ -493,7 +584,7 @@ useEffect(() => {
                       </Text>
                     ) : null}
 
-                    {!isShared ? (
+                    {!isShared && !isSharing ? (
                       <TouchableOpacity onPress={() => toggleAcceptPolicy(index)} style={{ marginTop: 10 }}>
                         <Text style={styles.playerWelcomeSubText}>
                           {video.acceptedPolicy ? '☑ ' : '☐ '}
@@ -506,6 +597,10 @@ useEffect(() => {
                     {isShared ? (
                       <View style={styles.sharedPill}>
                         <Text style={styles.sharedPillText}>✅ Shared</Text>
+                      </View>
+                    ) : isSharing ? (
+                      <View style={[styles.confirmButton, { opacity: 0.7 }]}>
+                        <Text style={styles.confirmButtonText}>Sharing…</Text>
                       </View>
                     ) : (
                       <TouchableOpacity
@@ -547,7 +642,12 @@ useEffect(() => {
           ) : (
             <View style={{ marginTop: 10 }}>
               {recentShared.slice(0,3).map((v) => (
-                <View key={v.id} style={styles.videoItemCard}>
+                <TouchableOpacity
+                  key={v.id}
+                  style={styles.videoItemCard}
+                  activeOpacity={0.9}
+                  onPress={() => openOverlay(v)}
+                >
                   <Text style={styles.videoItemTitle}>
                     {v.createdAtLabel || '—'}  •  {v.skill}
                   </Text>
@@ -555,11 +655,73 @@ useEffect(() => {
                   <Text style={styles.videoItemMeta}>
                     Status: {String(v.status || '').toUpperCase()}
                   </Text>
-                </View>
+                  <Text style={styles.videoItemMeta}>Tap to view markups</Text>
+                </TouchableOpacity>
               ))}
             </View>
           )}
         </View>
+
+        {/* Markups Modal */}
+        <Modal visible={overlayVisible} animationType="slide" onRequestClose={closeOverlay}>
+          <SafeAreaView style={styles.screenContainer}>
+            <ScrollView contentContainerStyle={styles.formScroll}>
+              <View style={styles.coachReviewHeaderRow}>
+                <Text style={styles.coachSectionTitle}>Video Markups</Text>
+                <TouchableOpacity onPress={closeOverlay}>
+                  <Text style={styles.coachCloseText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+
+              {overlayVideo ? (
+                <View style={styles.coachCard}>
+                  <Text style={styles.playerCardTitle}>
+                    {overlayVideo.coachName || 'Coach'}
+                    {overlayVideo.createdAtLabel ? `  •  ${overlayVideo.createdAtLabel}` : ''}
+                  </Text>
+
+                  <View
+                    style={overlayStageStyle}
+                    onLayout={(e) =>
+                      setOverlaySize({
+                        w: e.nativeEvent.layout.width,
+                        h: e.nativeEvent.layout.height,
+                      })
+                    }
+                  >
+                    <Video
+                      ref={overlayVideoRef}
+                      source={{ uri: overlayVideo.videoUrl }}
+                      style={styles.videoStageVideo}
+                      useNativeControls
+                      resizeMode={ResizeMode.CONTAIN}
+                      onPlaybackStatusUpdate={onOverlayStatus}
+                      onReadyForDisplay={onOverlayReadyForDisplay}
+                      progressUpdateIntervalMillis={250}
+                    />
+                    <VideoOverlayLayer
+                      overlays={overlayItems}
+                      currentTimeMs={overlayMs}
+                      width={overlaySize.w}
+                      height={overlaySize.h}
+                    />
+                  </View>
+
+                  {overlayItems.length === 0 ? (
+                    <Text style={styles.playerWelcomeSubText}>No markups yet.</Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                style={[styles.secondaryButton, { marginTop: 10, marginBottom: 30 }]}
+                onPress={closeOverlay}
+              >
+                <Text style={styles.secondaryButtonText}>Close</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
 
         {/* Ask AI Modal */}
         <Modal visible={askVisible} transparent animationType="fade" onRequestClose={closeAskAI}>

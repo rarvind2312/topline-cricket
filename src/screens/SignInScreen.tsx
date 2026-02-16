@@ -16,15 +16,16 @@ import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/aut
 
 import type { RootStackParamList, Role, AppUserProfile } from "../types";
 import { auth } from "../firebase";
-import { getUserProfile } from "../services/userProfile";
+import { getUserProfile, updateUserProfile } from "../services/userProfile";
+import { inferRoleBeforeAdmin, normalizeRole } from "../utils/roles";
 
 import { styles } from "../styles/styles";
 import { toplineLogo } from "../constants/assets";
 
 type Props = NativeStackScreenProps<RootStackParamList, "SignIn">;
 
-// Local role type includes "parent"
-type ProfileRole = "coach" | "player" | "parent";
+// Local role type includes "parent" + "admin" for runtime checks
+type ProfileRole = "coach" | "player" | "parent" | "admin";
 
 const SignInScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedRole, setSelectedRole] = useState<Role>("player");
@@ -74,14 +75,38 @@ const SignInScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
 
-      const pr = (profile.role as ProfileRole) || "player";
-      const selectedIsCoach = selectedRole === "coach";
-      const accountIsCoach = pr === "coach";
+      const tokenResult = await cred.user.getIdTokenResult(true).catch(() => null);
+      const isAdminClaim = Boolean(tokenResult?.claims?.admin);
 
-      if (selectedIsCoach !== accountIsCoach) {
+      const pr = (normalizeRole(profile.role) || "player") as ProfileRole;
+      const isAdminAccount = pr === "admin" || isAdminClaim;
+      let roleBeforeAdmin = normalizeRole((profile as any).roleBeforeAdmin) as
+        | ProfileRole
+        | null;
+      if (roleBeforeAdmin === "admin") roleBeforeAdmin = null;
+
+      if (isAdminAccount && !roleBeforeAdmin) {
+        const inferred = inferRoleBeforeAdmin(profile);
+        roleBeforeAdmin = inferred || (selectedRole === "coach" ? "coach" : "player");
+        updateUserProfile(uid, { roleBeforeAdmin }).catch((e) =>
+          console.log("Failed to set roleBeforeAdmin:", e)
+        );
+      }
+
+      const roleForLogin = isAdminAccount
+        ? roleBeforeAdmin || inferRoleBeforeAdmin(profile) || "coach"
+        : pr;
+      const selectedIsCoach = selectedRole === "coach";
+      const accountIsCoach = roleForLogin === "coach";
+
+      if (!isAdminAccount && selectedIsCoach !== accountIsCoach) {
+        const adminHint =
+          pr === "admin"
+            ? " If you were granted admin access, please sign in with your original role."
+            : "";
         Alert.alert(
           "Role mismatch",
-          `This account is registered as ${accountIsCoach ? "Coach" : "Player/Parent"}. Please switch the role and sign in again.`
+          `This account is registered as ${accountIsCoach ? "Coach" : "Player/Parent"}. Please switch the role and sign in again.${adminHint}`
         );
         await auth.signOut();
         return;

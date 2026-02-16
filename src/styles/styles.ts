@@ -1,6 +1,7 @@
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, StatusBar } from 'react-native';
 
 const COACH_RED = '#bb2b2b';
+const ANDROID_STATUS_BAR = Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0;
 
 export const styles = StyleSheet.create({
 // ---------- AUTH LANDING (PREMIUM, CROSS-PLATFORM) ----------
@@ -13,7 +14,7 @@ authLandingWrap: {
   flex: 1,
   justifyContent: "space-between",
   paddingHorizontal: 22,
-  paddingTop: 22,
+  paddingTop: Platform.OS === "android" ? ANDROID_STATUS_BAR + 20 : 22,
   paddingBottom: 28, 
 },
 
@@ -140,8 +141,8 @@ authLandingFinePrint: {
   /* ---------- AUTH SCREENS ---------- */
   authScrollContent: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === "ios" ? 12 : 16,   // Android needs a bit more top
-    paddingBottom: Platform.OS === "ios" ? 36 : 28, // balanced bottom spacing
+    paddingTop: Platform.OS === "android" ? ANDROID_STATUS_BAR + 20 : 12,
+    paddingBottom: Platform.OS === "ios" ? 36 : 32,
   },
 
   authHeaderRow: {
@@ -454,6 +455,34 @@ modalBodyText: {
 screen: {
   flex: 1,
   backgroundColor: '#ffffff',
+},
+
+floatingLaneButton: {
+  position: 'absolute',
+  right: 18,
+  bottom: 22,
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#E10600',
+  paddingHorizontal: 16,
+  height: 56,
+  borderRadius: 28,
+  shadowColor: '#000',
+  shadowOpacity: 0.2,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 5,
+},
+
+floatingLaneButtonIcon: {
+  fontSize: 18,
+  marginRight: 8,
+},
+
+floatingLaneButtonText: {
+  color: '#fff',
+  fontSize: 15,
+  fontWeight: '700',
 },
 
 container: {
@@ -891,7 +920,7 @@ quickActionsCard: {
 },
 
 quickActionTile: {
-  width: '23%',
+  width: '24%',
   borderRadius: 14,
   backgroundColor: '#FAFAFA',
   borderWidth: 1,
@@ -924,12 +953,13 @@ playerQuickActionEmoji: {
 },
 
 quickActionText: {
-  fontSize: 12,
+  fontSize: 11,
   fontWeight: '800',
   color: '#111111',
   textAlign: 'center',
-  lineHeight: 14,
-  minHeight: 28,           // ✅ keeps labels aligned (2 lines)
+  lineHeight: 13,
+  minHeight: 30,           // ✅ keeps labels aligned (2 lines)
+  width: "100%",
 },
 
 /* Stats card */
@@ -1158,6 +1188,8 @@ statsValue: {
 screenContainer: {
   flex: 1,
   backgroundColor: "#FFFFFF",
+  paddingTop: Platform.OS === "android" ? ANDROID_STATUS_BAR + 10 : 0,
+  paddingBottom: Platform.OS === "android" ? 16 : 0,
 },
 
 
@@ -1271,6 +1303,259 @@ videoPlayer: {
   marginBottom: 12,
 },
 
+videoStage: {
+  width: "100%",
+  height: 200,
+  borderRadius: 14,
+  overflow: "hidden",
+  backgroundColor: "#0B0F19",
+  marginTop: 12,
+  marginBottom: 12,
+  position: "relative",
+},
+
+videoStageVideo: {
+  width: "100%",
+  height: "100%",
+},
+
+videoStageTouch: {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+},
+
+overlayToolRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 8,
+},
+
+overlaySwatchRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: 8,
+  marginTop: 8,
+},
+
+overlaySwatch: {
+  width: 22,
+  height: 22,
+  borderRadius: 11,
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+},
+
+overlaySwatchActive: {
+  borderColor: "#111827",
+  borderWidth: 2,
+},
+
+overlaySwatchDivider: {
+  width: 1,
+  height: 18,
+  backgroundColor: "#e5e7eb",
+  marginHorizontal: 4,
+},
+
+overlayThicknessPill: {
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 999,
+  backgroundColor: "#f3f4f6",
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+},
+
+overlayThicknessPillActive: {
+  backgroundColor: "#111827",
+  borderColor: "#111827",
+},
+
+overlayThicknessText: {
+  fontSize: 11,
+  fontWeight: "700",
+  color: "#374151",
+},
+
+overlayThicknessTextActive: {
+  color: "#fff",
+},
+
+overlayToolPill: {
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 999,
+  backgroundColor: "#f3f4f6",
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+},
+
+overlayToolPillActive: {
+  backgroundColor: COACH_RED,
+  borderColor: COACH_RED,
+},
+
+overlayToolText: {
+  fontSize: 12,
+  fontWeight: "700",
+  color: "#374151",
+  textTransform: "capitalize",
+},
+
+overlayToolTextActive: {
+  color: "#fff",
+},
+
+overlayChipRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 6,
+  marginTop: 6,
+},
+
+overlayChip: {
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 999,
+  backgroundColor: "#f3f4f6",
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+},
+
+overlayChipActive: {
+  backgroundColor: COACH_RED,
+  borderColor: COACH_RED,
+},
+
+overlayChipText: {
+  fontSize: 11,
+  fontWeight: "700",
+  color: "#374151",
+},
+
+overlayChipTextActive: {
+  color: "#fff",
+},
+
+overlayActionRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 10,
+},
+
+overlayActionPill: {
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 999,
+  backgroundColor: "#f8fafc",
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+},
+
+overlayActionPillActive: {
+  backgroundColor: COACH_RED,
+  borderColor: COACH_RED,
+},
+
+overlayActionText: {
+  fontSize: 11,
+  fontWeight: "700",
+  color: "#374151",
+},
+
+overlayActionTextActive: {
+  color: "#fff",
+},
+
+overlayTimeRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginTop: 8,
+},
+
+overlayTimeText: {
+  fontSize: 12,
+  fontWeight: "700",
+  color: "#111827",
+},
+
+overlayTimeBtns: {
+  flexDirection: "row",
+  gap: 6,
+},
+
+overlayTimeBtn: {
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 999,
+  backgroundColor: "#f3f4f6",
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+},
+
+overlayTimeBtnText: {
+  fontSize: 11,
+  fontWeight: "700",
+  color: "#374151",
+},
+
+overlayHintText: {
+  fontSize: 12,
+  color: "#6b7280",
+  marginTop: 6,
+},
+
+overlayList: {
+  marginTop: 8,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+  backgroundColor: "#fafafa",
+  padding: 8,
+},
+
+overlayListItem: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+  paddingVertical: 4,
+},
+
+overlayListTime: {
+  fontSize: 11,
+  fontWeight: "700",
+  color: "#111827",
+  width: 44,
+},
+
+overlayListType: {
+  fontSize: 11,
+  fontWeight: "700",
+  color: "#6b7280",
+  textTransform: "capitalize",
+  width: 54,
+},
+
+overlayListNote: {
+  fontSize: 11,
+  color: "#374151",
+  flex: 1,
+},
+
+overlayListMore: {
+  fontSize: 11,
+  color: "#6b7280",
+  marginTop: 4,
+  textAlign: "right",
+},
+
 /* Coach select */
 assignLabel: {
   fontSize: 16,
@@ -1377,7 +1662,7 @@ secondaryButtonText: {
 
 topRightLogoContainer: {
   position: "absolute",
-  top: 8,          // SafeArea-friendly
+  top: Platform.OS === "android" ? ANDROID_STATUS_BAR + 10 : 8,
   right: 16,
   zIndex: 50,
 },

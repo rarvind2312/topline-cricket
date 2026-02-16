@@ -31,6 +31,7 @@ import {
 import { fetchCoaches } from "../utils/publicUsers";
 import type { RootStackParamList } from '../types';
 import { styles } from '../styles/styles';
+import TimePickerModal from '../components/TimePickerModal';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { formatDayDate } from '../utils/dateFormatter';
@@ -118,6 +119,10 @@ export default function PlayerBookSessionScreenBody({ navigation }: Props) {
   const [selectedDuration, setSelectedDuration] = useState<number>(60);
   const [selectedWindowIndex, setSelectedWindowIndex] = useState<number>(-1);
   const [selectedStartTime, setSelectedStartTime] = useState<string>('');
+  const [timePicker, setTimePicker] = useState<{ visible: boolean; value: Date }>({
+    visible: false,
+    value: new Date(),
+  });
 
  // Load coaches list
 useEffect(() => {
@@ -225,6 +230,88 @@ useEffect(() => {
     setSelectedStartTime('');
   }, [selectedDuration, selectedWindowIndex, selectedCoachId, dateKey]);
 
+  const roundToStep = (d: Date, step = 30) => {
+    const mins = d.getMinutes();
+    const snapped = Math.round(mins / step) * step;
+    const next = new Date(d);
+    next.setMinutes(snapped);
+    next.setSeconds(0);
+    next.setMilliseconds(0);
+    return next;
+  };
+
+  const findNearestOption = (target: string, options: string[]) => {
+    if (!options.length) return '';
+    const t = toMinutes(target);
+    let best = options[0];
+    let bestDiff = Number.POSITIVE_INFINITY;
+    options.forEach((opt) => {
+      const diff = Math.abs(toMinutes(opt) - t);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = opt;
+      }
+    });
+    return best;
+  };
+
+  const openTimePicker = () => {
+    if (selectedWindowIndex < 0) {
+      Alert.alert('Select window', 'Please choose an available window first.');
+      return;
+    }
+    if (startOptions.length === 0) {
+      Alert.alert('No availability', 'No start times available for this window.');
+      return;
+    }
+    const base = selectedStartTime || startOptions[0];
+    const [h, m] = base.split(':').map(Number);
+    const d = new Date(date);
+    d.setHours(h, m, 0, 0);
+    setTimePicker({ visible: true, value: d });
+  };
+
+  const closeTimePicker = () => {
+    setTimePicker((prev) => ({ ...prev, visible: false }));
+  };
+
+  const applyPickedTime = (picked: Date) => {
+    if (startOptions.length === 0) {
+      setSelectedStartTime('');
+      return;
+    }
+    const snapped = roundToStep(picked, 30);
+    const hhmm = toHHMM(snapped.getHours() * 60 + snapped.getMinutes());
+    if (startOptions.includes(hhmm)) {
+      setSelectedStartTime(hhmm);
+      return;
+    }
+    const nearest = findNearestOption(hhmm, startOptions);
+    if (nearest) {
+      setSelectedStartTime(nearest);
+      Alert.alert('Adjusted', `Adjusted to nearest available time: ${nearest}`);
+    }
+  };
+
+  const onTimePicked = (event: DateTimePickerEvent, selected?: Date) => {
+    setTimePicker((prev) => {
+      if (!selected) {
+        return { ...prev, visible: Platform.OS !== 'ios' ? false : prev.visible };
+      }
+      const snapped = roundToStep(selected, 30);
+      if (Platform.OS === 'ios') {
+        return { ...prev, value: snapped };
+      }
+      applyPickedTime(snapped);
+      return { ...prev, value: snapped, visible: false };
+    });
+  };
+
+  const confirmTimePicker = () => {
+    applyPickedTime(timePicker.value);
+    closeTimePicker();
+  };
+
   const requestBooking = async () => {
     if (!playerId) {
       Alert.alert('Not signed in', 'Please sign in again.');
@@ -275,6 +362,8 @@ useEffect(() => {
         date: dateKey,
         slotStart: slot.start,
         slotEnd: slot.end,
+        startAtMs: toEpochMs(dateKey, slot.start),
+        endAtMs: toEpochMs(dateKey, slot.end),
 
         status: 'requested',
 
@@ -293,6 +382,15 @@ useEffect(() => {
   };
 
   const canRequest = selectedCoachId && startOptions.length > 0 && !!selectedStartTime;
+
+  const toEpochMs = (dateKey: string, hhmm: string): number | null => {
+    const [y, m, d] = String(dateKey || '').split('-').map(Number);
+    const [h, mi] = String(hhmm || '').split(':').map(Number);
+    if (!y || !m || !d || Number.isNaN(h) || Number.isNaN(mi)) return null;
+    const dt = new Date(y, m - 1, d, h, mi, 0, 0);
+    const ms = dt.getTime();
+    return Number.isNaN(ms) ? null : ms;
+  };
 
   return (
     <SafeAreaView style={styles.screenContainer}>
@@ -352,25 +450,34 @@ useEffect(() => {
             ) : null}
           </View>
 
-        <View style={styles.dashboardSectionWrap}>
-          <View style={styles.dashboardSectionHeader}>
-            <View style={styles.dashboardSectionHeaderLeft}>
-              <View style={styles.dashboardSectionIconWrap}>
-                <Text style={styles.dashboardSectionIcon}>⏱️</Text>
+          <View style={styles.dashboardSectionWrap}>
+            <View style={styles.dashboardSectionHeader}>
+              <View style={styles.dashboardSectionHeaderLeft}>
+                <View style={styles.dashboardSectionIconWrap}>
+                  <Text style={styles.dashboardSectionIcon}>⏱️</Text>
+                </View>
+                <Text style={styles.dashboardSectionTitle}>Available times</Text>
               </View>
-              <Text style={styles.dashboardSectionTitle}>Available times</Text>
             </View>
-          </View>
-          <View style={styles.dashboardSectionDivider} />
+            <View style={styles.dashboardSectionDivider} />
 
           <View style={styles.toplineSectionCard}>
             <Text style={styles.inputLabel}>Duration</Text>
-            <View style={styles.pickerCard}>
-              <Picker selectedValue={selectedDuration} onValueChange={(v) => setSelectedDuration(Number(v))}>
-                {DURATION_OPTIONS.map((d) => (
-                  <Picker.Item key={d} label={`${d} mins`} value={d} />
-                ))}
-              </Picker>
+            <View style={styles.pillRow}>
+              {DURATION_OPTIONS.map((d) => {
+                const active = selectedDuration === d;
+                return (
+                  <TouchableOpacity
+                    key={d}
+                    style={[styles.rolePill, active ? styles.rolePillActive : null]}
+                    onPress={() => setSelectedDuration(d)}
+                  >
+                    <Text style={[styles.rolePillText, active ? styles.rolePillTextActive : null]}>
+                      {d} mins
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
             <Text style={[styles.inputLabel, { marginTop: 12 }]}>Available windows</Text>
             {loadingSlots ? (
@@ -400,17 +507,18 @@ useEffect(() => {
             {selectedWindowIndex >= 0 ? (
               <>
                 <Text style={[styles.inputLabel, { marginTop: 12 }]}>Start time</Text>
-                <View style={styles.pickerCard}>
-                  <Picker
-                    selectedValue={selectedStartTime}
-                    onValueChange={(v) => setSelectedStartTime(String(v))}
-                  >
-                    <Picker.Item label="Select start time" value="" />
-                    {startOptions.map((t) => (
-                      <Picker.Item key={t} label={t} value={t} />
-                    ))}
-                  </Picker>
-                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.secondaryButton,
+                    { marginTop: 6, opacity: startOptions.length ? 1 : 0.6 },
+                  ]}
+                  onPress={openTimePicker}
+                  disabled={startOptions.length === 0}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    ⏰ {selectedStartTime || 'Select start time'}
+                  </Text>
+                </TouchableOpacity>
 
                 {selectedStartTime ? (
                   <Text style={[styles.playerWelcomeSubText, { marginTop: 8 }]}>
@@ -429,6 +537,14 @@ useEffect(() => {
             </TouchableOpacity>
             </View>
           </View>
+
+          <TimePickerModal
+            visible={timePicker.visible}
+            value={timePicker.value}
+            onChange={onTimePicked}
+            onCancel={closeTimePicker}
+            onConfirm={confirmTimePicker}
+          />
 
           <TouchableOpacity
             style={[styles.secondaryButton, { marginTop: 20, marginBottom: 30 }]}

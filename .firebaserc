@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "topline-cricket"
+    "default": "topline-cricket",
+    "prod": "topline-cricket",
+    "beta": "topline-cricket-beta"
   }
 }
